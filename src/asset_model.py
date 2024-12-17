@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Dict, List, Optional
 from datetime import date
 from .fixed_income import FixedIncomeModel, Bond
+from .public_equity import EquityModel, Equity
 
 class AssetModel:
     """Asset cash flow model with dynamic linking capabilities to liability model."""
@@ -12,6 +13,7 @@ class AssetModel:
         self.portfolio = {}
         self.scenarios = None
         self.fixed_income_model = FixedIncomeModel(config.get('fixed_income', {}))
+        self.equity_model = EquityModel(config.get('equity', {}))
         
     def set_economic_scenarios(self, scenarios: pd.DataFrame):
         """Set economic scenarios for asset projections."""
@@ -78,10 +80,41 @@ class AssetModel:
             
         return metrics
         
-    def project_equity(self, equity_portfolio: pd.DataFrame, scenario_idx: int) -> pd.DataFrame:
+    def project_equity(self, equities: List[Equity], scenario_idx: int) -> pd.DataFrame:
         """Project equity cash flows including dividends under given scenario."""
-        # Implementation for equity projection
-        pass
+        if self.scenarios is None:
+            raise ValueError("Economic scenarios must be set before projection")
+            
+        scenario_data = self.scenarios.iloc[scenario_idx:scenario_idx+1]
+        start_date = scenario_data.index[0]
+        end_date = start_date + pd.DateOffset(months=59)  # Project for 60 months
+        
+        projection_dates = pd.date_range(
+            start=start_date,
+            end=end_date,
+            freq='ME'
+        ).date
+        
+        # Create scenario rates for the projection period
+        scenario_rates = pd.DataFrame({
+            'equity_return': [scenario_data['equity_return'].iloc[0]] * len(projection_dates),
+            'risk_free_rate': [scenario_data['risk_free_rate'].iloc[0]] * len(projection_dates)
+        }, index=projection_dates)
+        
+        all_cashflows = []
+        
+        for equity in equities:
+            cf = self.equity_model.project_cashflows(
+                equity,
+                projection_dates,
+                scenario_rates
+            )
+            all_cashflows.append(cf)
+            
+        if not all_cashflows:
+            return pd.DataFrame()
+            
+        return pd.concat(all_cashflows, ignore_index=True)
         
     def calculate_reinvestment(self, available_cash: float, projection_date: pd.Timestamp,
                              scenario_idx: int) -> Dict:
