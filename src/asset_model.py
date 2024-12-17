@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 from datetime import date
 from .fixed_income import FixedIncomeModel, Bond
 from .public_equity import EquityModel, Equity
@@ -24,11 +24,14 @@ class AssetModel:
         if self.scenarios is None:
             raise ValueError("Economic scenarios must be set before projection")
             
-        scenario_rates = self.scenarios.iloc[scenario_idx]
+        scenario_data = self.scenarios.iloc[scenario_idx:scenario_idx+1]
+        start_date = scenario_data.index[0]
+        end_date = start_date + pd.DateOffset(months=59)  # Project for 60 months
+        
         projection_dates = pd.date_range(
-            start=scenario_rates.index[0],
-            end=scenario_rates.index[-1],
-            freq='M'
+            start=start_date,
+            end=end_date,
+            freq='ME'
         ).date
         
         all_cashflows = []
@@ -37,7 +40,7 @@ class AssetModel:
             cf = self.fixed_income_model.project_cashflows(
                 bond,
                 projection_dates,
-                scenario_rates
+                scenario_data
             )
             cf['instrument_id'] = bond.id
             all_cashflows.append(cf)
@@ -132,3 +135,89 @@ class AssetModel:
         """Calculate key risk metrics for the asset portfolio."""
         # Implementation for risk metrics calculation
         pass
+
+    def project_portfolio(
+        self,
+        bonds: List[Bond],
+        equities: List[Equity],
+        valuation_date: date,
+        scenario_idx: int,
+        projection_years: int = 100,
+        frequency: Literal['monthly', 'annual'] = 'monthly',
+        output_path: Optional[str] = None
+    ) -> Dict[str, pd.DataFrame]:
+        """Project both fixed income and equity cash flows.
+        
+        Args:
+            bonds: List of bonds to project
+            equities: List of equities to project
+            valuation_date: Starting date for projections
+            scenario_idx: Index of the scenario to use
+            projection_years: Number of years to project (default: 100)
+            frequency: Projection frequency ('monthly' or 'annual', default: 'monthly')
+            output_path: Optional path to export results to Excel
+            
+        Returns:
+            Dictionary containing DataFrames for:
+                - fixed_income_cf: Fixed income cash flows
+                - equity_cf: Equity cash flows and market values
+                - combined_cf: Combined portfolio cash flows
+        """
+        if self.scenarios is None:
+            raise ValueError("Economic scenarios must be set before projection")
+            
+        # Create projection dates
+        freq = 'ME' if frequency == 'monthly' else 'YE'
+        periods = projection_years * (12 if frequency == 'monthly' else 1)
+        
+        projection_dates = pd.date_range(
+            start=valuation_date,
+            periods=periods + 1,  # +1 to include the start date
+            freq=freq
+        ).date
+        
+        # Project fixed income
+        fixed_income_cf = self.project_fixed_income(bonds, scenario_idx)
+        if not fixed_income_cf.empty:
+            fixed_income_cf['asset_type'] = 'fixed_income'
+        
+        # Project equity
+        equity_cf = self.project_equity(equities, scenario_idx)
+        if not equity_cf.empty:
+            equity_cf['asset_type'] = 'equity'
+        
+        # Combine and process cash flows
+        all_cf = pd.concat([fixed_income_cf, equity_cf], ignore_index=True)
+        
+        # Calculate portfolio-level metrics
+        portfolio_cf = all_cf.groupby(['date', 'asset_type']).agg({
+            'market_value': 'sum',
+            'dividend_amount': 'sum',  # Will be NaN for fixed income
+            'total_return': 'mean'     # Average return by asset type
+        }).reset_index()
+        
+        # Calculate total portfolio metrics
+        total_portfolio = all_cf.groupby('date').agg({
+            'market_value': 'sum',
+            'dividend_amount': 'sum',
+            'total_return': lambda x: (x * all_cf.loc[x.index, 'market_value']).sum() / all_cf.loc[x.index, 'market_value'].sum()
+        }).reset_index()
+        total_portfolio['asset_type'] = 'total_portfolio'
+        
+        # Combine all portfolio views
+        portfolio_cf = pd.concat([portfolio_cf, total_portfolio], ignore_index=True)
+        
+        results = {
+            'fixed_income_cf': fixed_income_cf,
+            'equity_cf': equity_cf,
+            'portfolio_cf': portfolio_cf
+        }
+        
+        # Export to Excel if path provided
+        if output_path:
+            with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+                fixed_income_cf.to_excel(writer, sheet_name='Fixed Income CF', index=False)
+                equity_cf.to_excel(writer, sheet_name='Equity CF', index=False)
+                portfolio_cf.to_excel(writer, sheet_name='Portfolio Summary', index=False)
+        
+        return results

@@ -53,61 +53,57 @@ class FixedIncomeModel:
             'D': 0.25
         }
     
-    def project_cashflows(self, bond: Bond, projection_dates: List[date],
-                         scenario_rates: pd.DataFrame) -> pd.DataFrame:
-        """Project cash flows for a bond under given interest rate scenario."""
+    def project_cashflows(
+        self,
+        bond: Bond,
+        projection_dates: List[date],
+        scenario_rates: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Project bond cash flows under given scenario."""
         cashflows = []
-        current_rating = bond.credit_rating
+        
+        # Extract rates from scenario
+        risk_free_rate = scenario_rates['risk_free_rate'].iloc[0]
+        
+        # Add credit spread based on rating
+        credit_spread = self.config.get('credit_spread', {}).get(bond.credit_rating, 0.0)
+        discount_rate = risk_free_rate + credit_spread
+        
+        # Calculate payment dates and amounts
+        payment_interval = 12 // bond.payment_frequency  # months between payments
+        next_payment_date = pd.Timestamp(bond.issue_date)
         
         for proj_date in projection_dates:
-            if proj_date < bond.maturity_date:
-                # Calculate scheduled payments
-                if self._is_payment_date(proj_date, bond):
-                    coupon_payment = self._calculate_coupon_payment(bond)
-                    
-                    # Convert date to timestamp for pandas indexing
-                    scenario_date = pd.Timestamp(proj_date)
-                    
-                    # Apply credit risk
-                    payment_adjustment = self._apply_credit_risk(
-                        coupon_payment, 
-                        current_rating, 
-                        scenario_rates.loc[scenario_date, 'credit_spread']
-                    )
-                    
-                    cashflows.append({
-                        'date': proj_date,
-                        'coupon': payment_adjustment,
-                        'principal': 0.0,
-                        'credit_rating': current_rating
-                    })
-                    
-                # Update credit rating based on transition probability
-                current_rating = self._simulate_rating_transition(current_rating)
+            proj_ts = pd.Timestamp(proj_date)
+            if proj_ts >= next_payment_date:
+                # Calculate coupon payment
+                coupon_payment = bond.par_value * (bond.coupon_rate / bond.payment_frequency)
                 
-            elif proj_date == bond.maturity_date:
-                # Final coupon and principal payment
-                coupon_payment = self._calculate_coupon_payment(bond)
-                principal_payment = bond.par_value
-                
-                # Convert date to timestamp for pandas indexing
-                scenario_date = pd.Timestamp(proj_date)
-                
-                # Apply credit risk to final payments
-                payment_adjustment = self._apply_credit_risk(
-                    coupon_payment + principal_payment,
-                    current_rating,
-                    scenario_rates.loc[scenario_date, 'credit_spread']
-                )
+                # Add principal if maturity
+                if proj_date >= bond.maturity_date:
+                    principal_payment = bond.par_value
+                else:
+                    principal_payment = 0.0
                 
                 cashflows.append({
                     'date': proj_date,
-                    'coupon': coupon_payment * (payment_adjustment / (coupon_payment + principal_payment)),
-                    'principal': principal_payment * (payment_adjustment / (coupon_payment + principal_payment)),
-                    'credit_rating': current_rating
+                    'coupon_payment': coupon_payment,
+                    'principal_payment': principal_payment,
+                    'total_cashflow': coupon_payment + principal_payment
                 })
+                
+                next_payment_date = next_payment_date + pd.DateOffset(months=payment_interval)
         
-        return pd.DataFrame(cashflows)
+        if not cashflows:
+            return pd.DataFrame()
+            
+        cf_df = pd.DataFrame(cashflows)
+        
+        # Calculate market value and total return
+        cf_df['market_value'] = bond.par_value
+        cf_df['total_return'] = cf_df['total_cashflow'] / bond.par_value
+        
+        return cf_df
     
     def _is_payment_date(self, test_date: date, bond: Bond) -> bool:
         """Check if the date is a coupon payment date."""
@@ -145,7 +141,7 @@ class FixedIncomeModel:
         cashflows = self.project_cashflows(
             bond,
             [bond.maturity_date],
-            pd.DataFrame({'credit_spread': [0.0]}, index=[bond.maturity_date])
+            pd.DataFrame({'risk_free_rate': [0.0]}, index=[bond.maturity_date])
         )
         
         duration = 0
@@ -154,7 +150,7 @@ class FixedIncomeModel:
         for _, cf in cashflows.iterrows():
             t = (cf['date'] - bond.issue_date).days / 365
             pv_factor = 1 / (1 + yield_rate) ** t
-            cf_amount = cf['coupon'] + cf['principal']
+            cf_amount = cf['coupon_payment'] + cf['principal_payment']
             
             duration += t * cf_amount * pv_factor
             price += cf_amount * pv_factor
@@ -166,7 +162,7 @@ class FixedIncomeModel:
         cashflows = self.project_cashflows(
             bond,
             [bond.maturity_date],
-            pd.DataFrame({'credit_spread': [0.0]}, index=[bond.maturity_date])
+            pd.DataFrame({'risk_free_rate': [0.0]}, index=[bond.maturity_date])
         )
         
         convexity = 0
@@ -175,7 +171,7 @@ class FixedIncomeModel:
         for _, cf in cashflows.iterrows():
             t = (cf['date'] - bond.issue_date).days / 365
             pv_factor = 1 / (1 + yield_rate) ** t
-            cf_amount = cf['coupon'] + cf['principal']
+            cf_amount = cf['coupon_payment'] + cf['principal_payment']
             
             convexity += t * (t + 1) * cf_amount * pv_factor
             price += cf_amount * pv_factor
