@@ -192,6 +192,37 @@ equity_config = {
 }
 ```
 
+### Liability Specifications
+
+#### Insurance Contract Data Structure
+Each insurance contract should be instantiated as an `InsuranceContract` class with the following attributes:
+
+```python
+InsuranceContract(
+    id: str,                    # Unique identifier for the contract
+    issue_date: date,           # Contract issue date
+    maturity_date: date,        # Contract maturity date
+    premium_pattern: Dict[date, float],  # Premium cash flows {date: amount}
+    benefit_pattern: Dict[date, float],  # Benefit cash flows {date: amount}
+    expense_pattern: Dict[date, float],  # Expense cash flows {date: amount}
+    currency: str = 'USD'       # Currency of the contract (default: 'USD')
+)
+```
+
+#### Liability Cash Flow Output
+The liability model produces a DataFrame with the following structure:
+
+```python
+liability_cf = pd.DataFrame({
+    'date': date,              # Projection date
+    'contract_id': str,        # Contract identifier
+    'premium': float,          # Premium cash flow
+    'benefit': float,          # Benefit cash flow
+    'expense': float,          # Expense cash flow
+    'net_cashflow': float      # Net cash flow (premium - benefit - expense)
+})
+```
+
 ### Portfolio Projection Parameters
 
 When projecting the entire portfolio, the following parameters can be specified:
