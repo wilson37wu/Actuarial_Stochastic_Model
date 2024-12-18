@@ -110,6 +110,153 @@ Implementation of a stochastic model for insurance contract liability evaluation
    - Audit trail
    - Change control
 
+## Data Specifications
+
+### Economic Scenarios
+
+Economic scenarios should be provided as a pandas DataFrame with the following structure:
+
+```python
+scenarios_df = pd.DataFrame({
+    'equity_return': float[],      # Monthly/Annual equity market returns (e.g., 0.08 for 8%)
+    'risk_free_rate': float[],     # Risk-free rates (e.g., 0.03 for 3%)
+}, index=pd.DatetimeIndex)         # DatetimeIndex with projection dates
+```
+
+### Fixed Income Specifications
+
+#### Bond Data Structure
+Each bond should be instantiated as a `Bond` class with the following attributes:
+
+```python
+Bond(
+    id: str,                    # Unique identifier for the bond
+    par_value: float,           # Face value of the bond
+    coupon_rate: float,         # Annual coupon rate (e.g., 0.035 for 3.5%)
+    maturity_date: date,        # Maturity date
+    payment_frequency: int,      # Number of payments per year (e.g., 2 for semi-annual)
+    credit_rating: str,         # Credit rating (e.g., 'AAA', 'AA', etc.)
+    issue_date: date,           # Date of issuance
+    purchase_price: float,      # Price at which the bond was purchased
+    currency: str = 'USD'       # Currency of the bond (default: 'USD')
+)
+```
+
+#### Fixed Income Model Configuration
+The fixed income model requires configuration for credit spreads:
+
+```python
+fixed_income_config = {
+    'credit_spread': {
+        'AAA': float,           # Credit spread for AAA-rated bonds
+        'AA': float,           # Credit spread for AA-rated bonds
+        'A': float,            # Credit spread for A-rated bonds
+        # ... other ratings
+    }
+}
+```
+
+### Public Equity Specifications
+
+#### Equity Position Data Structure
+Each equity position should be instantiated as an `Equity` class with the following attributes:
+
+```python
+Equity(
+    id: str,                    # Unique identifier for the equity
+    quantity: float,            # Number of shares
+    initial_price: float,       # Price per share at start of projection
+    dividend_yield: float,      # Annual dividend yield (e.g., 0.02 for 2%)
+    beta: float,               # Market beta of the equity
+    sector: str,               # Industry sector
+    purchase_date: date,        # Date of purchase
+    currency: str = 'USD'       # Currency (default: 'USD')
+)
+```
+
+#### Equity Model Configuration
+The equity model requires configuration for market parameters:
+
+```python
+equity_config = {
+    'market_volatility': float,     # Overall market volatility (e.g., 0.15 for 15%)
+    'sector_correlations': {        # Correlation matrix between sectors
+        'Technology': {
+            'Technology': 1.0,
+            'Financial': float,
+            'Healthcare': float,
+            # ... other sectors
+        },
+        # ... other sectors
+    }
+}
+```
+
+### Portfolio Projection Parameters
+
+When projecting the entire portfolio, the following parameters can be specified:
+
+```python
+project_portfolio(
+    bonds: List[Bond],              # List of bond positions
+    equities: List[Equity],         # List of equity positions
+    valuation_date: date,           # Starting date for projections
+    scenario_idx: int,              # Index of scenario to use
+    projection_years: int = 100,    # Number of years to project (default: 100)
+    frequency: str = 'monthly',     # 'monthly' or 'annual'
+    output_path: Optional[str]      # Path for Excel output (optional)
+)
+```
+
+### Output Specifications
+
+The model produces three main types of output DataFrames:
+
+#### 1. Fixed Income Cash Flows
+```python
+fixed_income_cf = pd.DataFrame({
+    'date': date,                   # Payment date
+    'instrument_id': str,           # Bond identifier
+    'coupon_payment': float,        # Coupon payment amount
+    'principal_payment': float,     # Principal payment amount
+    'total_cashflow': float,        # Total payment
+    'market_value': float,          # Current market value
+    'total_return': float           # Total return for the period
+})
+```
+
+#### 2. Equity Cash Flows
+```python
+equity_cf = pd.DataFrame({
+    'date': date,                   # Projection date
+    'instrument_id': str,           # Equity identifier
+    'market_value': float,          # Current market value
+    'dividend_amount': float,       # Dividend payment
+    'total_return': float           # Total return including price appreciation
+})
+```
+
+#### 3. Portfolio Summary
+```python
+portfolio_cf = pd.DataFrame({
+    'date': date,                   # Projection date
+    'asset_type': str,              # 'fixed_income', 'equity', or 'total_portfolio'
+    'market_value': float,          # Total market value
+    'dividend_amount': float,       # Total dividend payments
+    'total_return': float           # Portfolio-level return
+})
+```
+
+## Excel Output Format
+
+When exporting to Excel, the results are organized in three sheets:
+
+1. **Fixed Income CF**: Detailed bond cash flows
+2. **Equity CF**: Detailed equity projections
+3. **Portfolio Summary**: Combined portfolio metrics
+
+Each sheet follows the structure of its corresponding DataFrame as specified above.
+
 ## Dependencies
 ```txt
 numpy>=1.21.0
@@ -119,4 +266,3 @@ dask>=2021.6.0
 pytest>=6.2.0
 matplotlib>=3.4.0
 seaborn>=0.11.0
-```
