@@ -1,0 +1,18 @@
+{
+    "asset": {
+        "strategy": "Dynamic",
+        "equity_weight": 0.6,
+        "bond_weight": 0.4,
+        "target_year": 2050
+    },
+    "liability": {
+        "product_type": "PAR_WHOLE_LIFE",
+        "projection_years": 50,
+        "premium_pattern": "INCREASING"
+    },
+    "assumptions": {
+        "mortality_improvement": true,
+        "lapse_study_start": "2020-01-01",
+        "inflation_base_rate": 0.02
+    }
+}
