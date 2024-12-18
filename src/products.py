@@ -128,17 +128,34 @@ class BaseInsuranceContract:
     
     def get_attained_age(self, valuation_date: date) -> int:
         """Calculate attained age at valuation date."""
-        years_since_issue = (valuation_date - self.issue_date).days / 365.25
+        if isinstance(valuation_date, pd.Timestamp):
+            valuation_date = valuation_date.date()
+        if isinstance(self.issue_date, pd.Timestamp):
+            issue_date = self.issue_date.date()
+        else:
+            issue_date = self.issue_date
+        years_since_issue = (valuation_date - issue_date).days / 365.25
         return self.issue_age + int(years_since_issue)
     
     def get_policy_duration(self, valuation_date: date) -> int:
         """Calculate policy duration in years."""
-        return int((valuation_date - self.issue_date).days / 365.25)
+        if isinstance(valuation_date, pd.Timestamp):
+            valuation_date = valuation_date.date()
+        if isinstance(self.issue_date, pd.Timestamp):
+            issue_date = self.issue_date.date()
+        else:
+            issue_date = self.issue_date
+        return int((valuation_date - issue_date).days / 365.25)
     
     def is_active(self, valuation_date: date) -> bool:
         """Check if policy is still active."""
-        duration = self.get_policy_duration(valuation_date)
-        return 0 <= duration < self.term_length
+        try:
+            if isinstance(valuation_date, pd.Timestamp):
+                valuation_date = valuation_date.date()
+            duration = self.get_policy_duration(valuation_date)
+            return 0 <= duration < self.term_length
+        except Exception as e:
+            raise RuntimeError(f"Error checking policy active status: {str(e)}")
     
     def get_modal_premium(self) -> float:
         """Get premium amount based on payment mode."""
