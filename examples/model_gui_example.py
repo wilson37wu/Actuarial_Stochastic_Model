@@ -3,12 +3,22 @@ Example script demonstrating the use of the model input GUI.
 """
 import sys
 import os
+from pathlib import Path
 
 # Add the parent directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent
+sys.path.append(str(parent_dir))
 
-from src.model_gui import launch_gui
+try:
+    import openpyxl
+except ImportError:
+    print("Installing required package: openpyxl")
+    os.system("pip install openpyxl")
+    import openpyxl
 
-if __name__ == '__main__':
-    # Launch the GUI
-    launch_gui()
+from src.model_gui import ModelInputGUI
+
+if __name__ == "__main__":
+    gui = ModelInputGUI()
+    gui.run()

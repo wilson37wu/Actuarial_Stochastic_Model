@@ -3,14 +3,15 @@ GUI interface for managing asset and liability projection inputs.
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import json
 import os
 from datetime import date
+import pandas as pd
 
 from .enums import (
     Sex, SmokingStatus, OccupationClass,
-    UnderwritingClass, ProductType, AssetClass, PremiumMode
+    UnderwritingClass, ProductType, AssetClass, PremiumMode, DividendOption
 )
 from .actuarial_assumptions import (
     create_sample_mortality_table,
@@ -19,7 +20,45 @@ from .actuarial_assumptions import (
 )
 from .investment import TargetDateStrategy, DynamicStrategy
 from .liability import LiabilityModel
-from .products import BaseInsuranceContract
+from .products import (
+    BaseInsuranceContract, TermInsurance, WholeLifeInsurance,
+    ParticipatingWholeLife, UniversalLife, UnitLinkedInsurance
+)
+
+class ToolTip:
+    """Create a tooltip for a given widget."""
+    
+    def __init__(self, widget: tk.Widget, text: str):
+        """Initialize the tooltip."""
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind('<Enter>', self.show_tooltip)
+        self.widget.bind('<Leave>', self.hide_tooltip)
+    
+    def show_tooltip(self, event=None):
+        """Display the tooltip."""
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 20
+        
+        # Create top-level window
+        self.tooltip = tk.Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        
+        label = tk.Label(
+            self.tooltip, text=self.text, justify='left',
+            background="#ffffe0", relief='solid', borderwidth=1,
+            font=("Arial", "10", "normal")
+        )
+        label.pack()
+    
+    def hide_tooltip(self, event=None):
+        """Hide the tooltip."""
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
 
 class ModelInputGUI:
     """GUI for managing model inputs."""
@@ -30,14 +69,47 @@ class ModelInputGUI:
         self.root.title("Actuarial Model Input Manager")
         self.root.geometry("800x600")
         
-        # Configure style
+        # Configure styles
         self.style = ttk.Style()
+        
+        # Configure label style
+        self.style.configure(
+            'Custom.TLabel',
+            foreground='black',
+            background='#d3d3d3',
+            padding=5
+        )
+        
+        # Configure combobox style
+        self.style.configure(
+            'Custom.TCombobox',
+            fieldbackground='#d3d3d3',
+            foreground='black',
+            selectbackground='#d3d3d3',
+            selectforeground='black'
+        )
+        
+        # Configure button style
         self.style.configure(
             'Custom.TButton',
-            background='#d3d3d3',  # Light grey
+            background='#d3d3d3',
             foreground='black',
             borderwidth=1,
             relief='raised'
+        )
+        
+        # Configure entry style
+        self.style.configure(
+            'Custom.TEntry',
+            fieldbackground='#d3d3d3',
+            foreground='black'
+        )
+        
+        # Configure checkbutton style
+        self.style.configure(
+            'Custom.TCheckbutton',
+            foreground='black',
+            background='#d3d3d3'
         )
         
         # Create notebook for tabs
@@ -64,45 +136,74 @@ class ModelInputGUI:
         # Add buttons
         self.create_control_buttons()
     
-    def init_variables(self):
-        """Initialize input variables with default values."""
-        # Asset projection variables
-        self.asset_strategy = tk.StringVar(value="TargetDate")
-        self.equity_weight = tk.DoubleVar(value=0.6)
-        self.bond_weight = tk.DoubleVar(value=0.4)
-        self.target_year = tk.IntVar(value=2050)
-        
-        # Liability projection variables
-        self.product_type = tk.StringVar(value="WHOLE_LIFE")
-        self.projection_years = tk.IntVar(value=50)
-        self.premium_pattern = tk.StringVar(value="LEVEL")
-        
-        # Actuarial assumption variables
-        self.mortality_improvement = tk.BooleanVar(value=True)
-        self.lapse_study_start = tk.StringVar(value="2020-01-01")
-        self.inflation_base_rate = tk.DoubleVar(value=0.02)
+    def create_styled_label(self, parent, text, row, column, **kwargs):
+        """Create a styled label."""
+        label = ttk.Label(
+            parent,
+            text=text,
+            style='Custom.TLabel'
+        )
+        label.grid(row=row, column=column, padx=5, pady=5, sticky='w', **kwargs)
+        return label
     
+    def create_styled_combobox(self, parent, textvariable, values, row, column, **kwargs):
+        """Create a styled combobox."""
+        combo = ttk.Combobox(
+            parent,
+            textvariable=textvariable,
+            style='Custom.TCombobox',
+            state='readonly'
+        )
+        combo['values'] = values
+        combo.grid(row=row, column=column, padx=5, pady=5, sticky='ew', **kwargs)
+        return combo
+    
+    def create_styled_entry(self, parent, textvariable, row, column, **kwargs):
+        """Create a styled entry."""
+        entry = ttk.Entry(
+            parent,
+            textvariable=textvariable,
+            style='Custom.TEntry'
+        )
+        entry.grid(row=row, column=column, padx=5, pady=5, sticky='ew', **kwargs)
+        return entry
+    
+    def create_styled_checkbutton(self, parent, text, variable, row, column, **kwargs):
+        """Create a styled checkbutton."""
+        checkbutton = ttk.Checkbutton(
+            parent,
+            text=text,
+            variable=variable,
+            style='Custom.TCheckbutton'
+        )
+        checkbutton.grid(row=row, column=column, padx=5, pady=5, sticky='w', **kwargs)
+        return checkbutton
+
     def create_asset_inputs(self):
         """Create asset projection input fields."""
         frame = ttk.LabelFrame(self.asset_tab, text="Asset Strategy Settings")
         frame.pack(fill='x', padx=10, pady=5)
         
         # Strategy selection
-        ttk.Label(frame, text="Investment Strategy:").grid(row=0, column=0, padx=5, pady=5)
-        strategy_combo = ttk.Combobox(frame, textvariable=self.asset_strategy)
-        strategy_combo['values'] = ('TargetDate', 'Dynamic')
-        strategy_combo.grid(row=0, column=1, padx=5, pady=5)
+        self.create_styled_label(frame, "Investment Strategy:", 0, 0)
+        self.create_styled_combobox(frame, self.asset_strategy, ['TargetDate', 'Dynamic'], 0, 1)
         
         # Asset weights
-        ttk.Label(frame, text="Equity Weight:").grid(row=1, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.equity_weight).grid(row=1, column=1, padx=5, pady=5)
+        self.create_styled_label(frame, "Equity Weight:", 1, 0)
+        equity_entry = self.create_styled_entry(frame, self.equity_weight, 1, 1)
+        ToolTip(equity_entry, "Weight of equity in the portfolio (0-1)")
         
-        ttk.Label(frame, text="Bond Weight:").grid(row=2, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.bond_weight).grid(row=2, column=1, padx=5, pady=5)
+        self.create_styled_label(frame, "Bond Weight:", 2, 0)
+        bond_entry = self.create_styled_entry(frame, self.bond_weight, 2, 1)
+        ToolTip(bond_entry, "Weight of bonds in the portfolio (0-1)")
         
-        # Target year for target date strategy
-        ttk.Label(frame, text="Target Year:").grid(row=3, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.target_year).grid(row=3, column=1, padx=5, pady=5)
+        # Target year
+        self.create_styled_label(frame, "Target Year:", 3, 0)
+        target_year_entry = self.create_styled_entry(frame, self.target_year, 3, 1)
+        ToolTip(target_year_entry, "Target year for the investment strategy")
+        
+        # Configure grid weights
+        frame.columnconfigure(1, weight=1)
     
     def create_liability_inputs(self):
         """Create liability projection input fields."""
@@ -110,20 +211,20 @@ class ModelInputGUI:
         frame.pack(fill='x', padx=10, pady=5)
         
         # Product type selection
-        ttk.Label(frame, text="Product Type:").grid(row=0, column=0, padx=5, pady=5)
-        product_combo = ttk.Combobox(frame, textvariable=self.product_type)
-        product_combo['values'] = [p.name for p in ProductType]
-        product_combo.grid(row=0, column=1, padx=5, pady=5)
+        self.create_styled_label(frame, "Product Type:", 0, 0)
+        self.create_styled_combobox(frame, self.product_type, [p.name for p in ProductType], 0, 1)
         
         # Projection years
-        ttk.Label(frame, text="Projection Years:").grid(row=1, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.projection_years).grid(row=1, column=1, padx=5, pady=5)
+        self.create_styled_label(frame, "Projection Years:", 1, 0)
+        projection_years_entry = self.create_styled_entry(frame, self.projection_years, 1, 1)
+        ToolTip(projection_years_entry, "Number of years to project liability cash flows")
         
-        # Premium pattern
-        ttk.Label(frame, text="Premium Pattern:").grid(row=2, column=0, padx=5, pady=5)
-        pattern_combo = ttk.Combobox(frame, textvariable=self.premium_pattern)
-        pattern_combo['values'] = ('LEVEL', 'INCREASING', 'DECREASING')
-        pattern_combo.grid(row=2, column=1, padx=5, pady=5)
+        # Premium mode
+        self.create_styled_label(frame, "Premium Mode:", 2, 0)
+        self.create_styled_combobox(frame, self.premium_pattern, [p.name for p in PremiumMode], 2, 1)
+        
+        # Configure grid weights
+        frame.columnconfigure(1, weight=1)
     
     def create_assumption_inputs(self):
         """Create actuarial assumption input fields."""
@@ -131,28 +232,39 @@ class ModelInputGUI:
         frame.pack(fill='x', padx=10, pady=5)
         
         # Mortality improvement checkbox
-        ttk.Checkbutton(
-            frame, text="Apply Mortality Improvement",
-            variable=self.mortality_improvement
-        ).grid(row=0, column=0, columnspan=2, padx=5, pady=5)
+        self.create_styled_checkbutton(frame, "Apply Mortality Improvement", self.mortality_improvement, 0, 0, columnspan=2)
         
         # Lapse study start date
-        ttk.Label(frame, text="Lapse Study Start:").grid(row=1, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.lapse_study_start).grid(row=1, column=1, padx=5, pady=5)
+        self.create_styled_label(frame, "Lapse Study Start:", 1, 0)
+        lapse_study_start_entry = self.create_styled_entry(frame, self.lapse_study_start, 1, 1)
+        ToolTip(lapse_study_start_entry, "Start date of the lapse study (YYYY-MM-DD)")
         
         # Inflation base rate
-        ttk.Label(frame, text="Base Inflation Rate:").grid(row=2, column=0, padx=5, pady=5)
-        ttk.Entry(frame, textvariable=self.inflation_base_rate).grid(row=2, column=1, padx=5, pady=5)
-    
+        self.create_styled_label(frame, "Base Inflation Rate:", 2, 0)
+        inflation_base_rate_entry = self.create_styled_entry(frame, self.inflation_base_rate, 2, 1)
+        ToolTip(inflation_base_rate_entry, "Base inflation rate for the projection")
+        
+        # Configure grid weights
+        frame.columnconfigure(1, weight=1)
+
     def create_control_buttons(self):
         """Create control buttons."""
         button_frame = ttk.Frame(self.root)
         button_frame.pack(fill='x', padx=10, pady=5)
         
         # Create custom button style
+        self.root.tk.call('ttk::style', 'configure', 'Export.TButton',
+                         font=('Helvetica', 10, 'bold'),
+                         foreground='green')
+        
         button_style = {
             'style': 'Custom.TButton',
             'width': 15
+        }
+        
+        export_style = {
+            'style': 'Export.TButton',
+            'width': 20
         }
         
         ttk.Button(
@@ -178,7 +290,14 @@ class ModelInputGUI:
             command=self.run_model,
             **button_style
         ).pack(side='right', padx=5)
-    
+        
+        ttk.Button(
+            button_frame, 
+            text="📊 Export Results to Excel",
+            command=self.export_to_excel,
+            **export_style
+        ).pack(side='right', padx=5)
+
     def get_settings(self) -> Dict[str, Any]:
         """Get all current settings as a dictionary."""
         return {
@@ -191,7 +310,7 @@ class ModelInputGUI:
             'liability': {
                 'product_type': self.product_type.get(),
                 'projection_years': self.projection_years.get(),
-                'premium_pattern': self.premium_pattern.get()
+                'premium_mode': self.premium_pattern.get()  # Renamed key to match its purpose
             },
             'assumptions': {
                 'mortality_improvement': self.mortality_improvement.get(),
@@ -229,7 +348,7 @@ class ModelInputGUI:
             # Update liability settings
             self.product_type.set(settings['liability']['product_type'])
             self.projection_years.set(settings['liability']['projection_years'])
-            self.premium_pattern.set(settings['liability']['premium_pattern'])
+            self.premium_pattern.set(settings['liability']['premium_mode'])  # Renamed key to match its purpose
             
             # Update assumption settings
             self.mortality_improvement.set(settings['assumptions']['mortality_improvement'])
@@ -247,42 +366,331 @@ class ModelInputGUI:
         self.init_variables()
         messagebox.showinfo("Success", "Settings reset to defaults!")
     
+    def validate_inputs(self) -> Tuple[bool, str]:
+        """Validate all input fields before running the model."""
+        try:
+            # Validate projection years
+            try:
+                proj_years = int(self.projection_years.get())
+                if proj_years <= 0:
+                    return False, "Projection years must be a positive integer"
+            except ValueError:
+                return False, "Projection years must be a valid number"
+            
+            # Validate asset weights
+            try:
+                equity = float(self.equity_weight.get())
+                bond = float(self.bond_weight.get())
+                if not (0 <= equity <= 1 and 0 <= bond <= 1):
+                    return False, "Asset weights must be between 0 and 1"
+                if equity + bond > 1:
+                    return False, "Sum of asset weights cannot exceed 100%"
+            except ValueError:
+                return False, "Asset weights must be valid numbers"
+            
+            # Validate target year
+            if self.asset_strategy.get() == 'TargetDate':
+                try:
+                    target_year = int(self.target_year.get())
+                    current_year = pd.Timestamp.today().year
+                    if target_year < current_year:
+                        return False, f"Target year must be greater than or equal to {current_year}"
+                except ValueError:
+                    return False, "Target year must be a valid number"
+            
+            # Validate inflation rate
+            try:
+                inflation = float(self.inflation_base_rate.get())
+                if not (-0.1 <= inflation <= 0.2):  # Allow deflation up to -10% and inflation up to 20%
+                    return False, "Inflation rate must be between -10% and 20%"
+            except ValueError:
+                return False, "Inflation rate must be a valid number"
+            
+            # Validate lapse study start date
+            try:
+                pd.Timestamp(self.lapse_study_start.get())
+            except ValueError:
+                return False, "Lapse study start date must be in YYYY-MM-DD format"
+            
+            return True, ""
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)}"
+
     def run_model(self):
         """Run the model with current settings."""
         try:
+            # First validate all inputs
+            is_valid, error_message = self.validate_inputs()
+            if not is_valid:
+                messagebox.showerror("Input Error", error_message)
+                return
+            
             settings = self.get_settings()
+            
+            # Create investment strategy
+            try:
+                if settings['asset']['strategy'] == 'TargetDate':
+                    investment_strategy = TargetDateStrategy(
+                        target_year=int(settings['asset']['target_year']),
+                        initial_equity=float(settings['asset']['equity_weight'])
+                    )
+                else:
+                    # Create base allocation for dynamic strategy
+                    equity_weight = float(settings['asset']['equity_weight'])
+                    bond_weight = float(settings['asset']['bond_weight'])
+                    cash_weight = max(0, 1 - equity_weight - bond_weight)
+                    
+                    base_allocation = {
+                        AssetClass.LARGE_CAP_EQUITY: equity_weight,
+                        AssetClass.GOVERNMENT_BOND: bond_weight,
+                        AssetClass.CASH: cash_weight
+                    }
+                    investment_strategy = DynamicStrategy(
+                        base_allocation=base_allocation,
+                        max_deviation=0.2  # 20% maximum deviation from base allocation
+                    )
+            except Exception as e:
+                messagebox.showerror("Strategy Error", f"Failed to create investment strategy: {str(e)}")
+                return
+            
+            # Create sample contract based on product type
+            try:
+                contract_class = {
+                    'TERM': TermInsurance,
+                    'WHOLE_LIFE': WholeLifeInsurance,
+                    'PAR_WHOLE_LIFE': ParticipatingWholeLife,
+                    'UNIVERSAL_LIFE': UniversalLife,
+                    'UNIT_LINKED': UnitLinkedInsurance
+                }[settings['liability']['product_type']]
+            except KeyError:
+                messagebox.showerror("Product Error", f"Invalid product type: {settings['liability']['product_type']}")
+                return
+            
+            # Parse the valuation date (today's date)
+            try:
+                valuation_date = pd.Timestamp.today().date()
+            except Exception as e:
+                messagebox.showerror("Date Error", f"Failed to create valuation date: {str(e)}")
+                return
+            
+            # Create contract with appropriate parameters
+            try:
+                base_params = {
+                    'policy_number': "SAMPLE001",
+                    'issue_date': valuation_date,
+                    'term_length': int(settings['liability']['projection_years']),
+                    'premium': 1000,  # Fixed annual premium for simplicity
+                    'issue_age': 35,  # Sample age
+                    'sex': Sex.MALE,  # Sample sex
+                    'smoking_status': SmokingStatus.NON_SMOKER,
+                    'occupation_class': OccupationClass.PROFESSIONAL,
+                    'underwriting_class': UnderwritingClass.STANDARD,
+                    'premium_mode': getattr(PremiumMode, settings['liability']['premium_mode'])
+                }
+            except Exception as e:
+                messagebox.showerror("Contract Error", f"Failed to create contract parameters: {str(e)}")
+                return
+
+            # Create the specific contract type
+            try:
+                if settings['liability']['product_type'] == 'TERM':
+                    sample_contract = contract_class(
+                        face_amount=100000,
+                        **base_params
+                    )
+                elif settings['liability']['product_type'] == 'WHOLE_LIFE':
+                    sample_contract = contract_class(
+                        face_amount=100000,
+                        guaranteed_rate=float(settings['assumptions']['inflation_base_rate']),
+                        **base_params
+                    )
+                elif settings['liability']['product_type'] == 'PAR_WHOLE_LIFE':
+                    sample_contract = contract_class(
+                        face_amount=100000,
+                        guaranteed_rate=float(settings['assumptions']['inflation_base_rate']),
+                        dividend_option=DividendOption.CASH,
+                        dividend_scale=float(settings['assumptions']['inflation_base_rate']) + 0.02,  # 2% above guaranteed rate
+                        **base_params
+                    )
+                elif settings['liability']['product_type'] == 'UNIVERSAL_LIFE':
+                    sample_contract = contract_class(
+                        initial_face_amount=100000,
+                        min_guaranteed_rate=float(settings['assumptions']['inflation_base_rate']) - 0.01,  # 1% below inflation
+                        current_credited_rate=float(settings['assumptions']['inflation_base_rate']) + 0.01,  # 1% above inflation
+                        cost_of_insurance={i: 0.001 * (1.05 ** i) for i in range(int(settings['liability']['projection_years']))},
+                        **base_params
+                    )
+                else:  # UNIT_LINKED
+                    equity_weight = float(settings['asset']['equity_weight'])
+                    bond_weight = float(settings['asset']['bond_weight'])
+                    
+                    sample_contract = contract_class(
+                        initial_face_amount=100000,
+                        investment_strategy='BALANCED',
+                        fund_allocation={
+                            'equity': equity_weight,
+                            'bond': bond_weight
+                        },
+                        fund_charges={'equity': 0.015, 'bond': 0.01},
+                        **base_params
+                    )
+            except Exception as e:
+                messagebox.showerror("Contract Error", f"Failed to create specific contract type: {str(e)}")
+                return
+            
+            # Create and initialize liability model
+            try:
+                mortality_table = create_sample_mortality_table()
+                lapse_assumption = create_sample_lapse_assumption()
+                inflation_assumption = create_sample_inflation_assumption()
+                
+                liability_model = LiabilityModel(
+                    mortality_table=mortality_table,
+                    lapse_assumption=lapse_assumption,
+                    inflation_assumption=inflation_assumption,
+                    investment_returns=None  # We'll set this based on the investment strategy later
+                )
+            except Exception as e:
+                messagebox.showerror("Model Error", f"Failed to initialize liability model: {str(e)}")
+                return
+            
+            # Add the sample contract to the model and project cash flows
+            try:
+                liability_model.add_contract(sample_contract)
+                projection = liability_model.project_cashflows(
+                    valuation_date=valuation_date,
+                    projection_years=int(settings['liability']['projection_years'])
+                )
+                
+                # Show success message with some basic projection results
+                total_premium = sum(projection.premiums)
+                total_benefit = sum(projection.death_benefits)
+                total_surrender = sum(projection.surrenders)
+                
+                messagebox.showinfo(
+                    "Success",
+                    f"Model executed successfully!\n\n"
+                    f"Total Premium: ${total_premium:,.2f}\n"
+                    f"Total Death Benefits: ${total_benefit:,.2f}\n"
+                    f"Total Surrender Value: ${total_surrender:,.2f}"
+                )
+                
+            except Exception as e:
+                messagebox.showerror("Projection Error", f"Failed to project cash flows: {str(e)}")
+                return
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+    
+    def export_to_excel(self):
+        """Export model results to Excel."""
+        try:
+            # First try to import openpyxl
+            try:
+                import openpyxl
+            except ImportError:
+                messagebox.showerror(
+                    "Missing Dependency",
+                    "The openpyxl package is required for Excel export.\n"
+                    "Please install it using:\n"
+                    "pip install openpyxl"
+                )
+                return
+                
+            # First validate all inputs
+            is_valid, error_message = self.validate_inputs()
+            if not is_valid:
+                messagebox.showerror("Input Error", error_message)
+                return
+            
+            settings = self.get_settings()
+            
+            # Run the model to get projections
+            valuation_date = pd.Timestamp.today().date()
             
             # Create investment strategy
             if settings['asset']['strategy'] == 'TargetDate':
                 investment_strategy = TargetDateStrategy(
-                    target_year=settings['asset']['target_year'],
-                    initial_equity=settings['asset']['equity_weight']
+                    target_year=int(settings['asset']['target_year']),
+                    initial_equity=float(settings['asset']['equity_weight'])
                 )
             else:
-                # Create base allocation for dynamic strategy
+                equity_weight = float(settings['asset']['equity_weight'])
+                bond_weight = float(settings['asset']['bond_weight'])
+                cash_weight = max(0, 1 - equity_weight - bond_weight)
+                
                 base_allocation = {
-                    AssetClass.LARGE_CAP_EQUITY: settings['asset']['equity_weight'],
-                    AssetClass.GOVERNMENT_BOND: settings['asset']['bond_weight'],
-                    AssetClass.CASH: max(0, 1 - settings['asset']['equity_weight'] - settings['asset']['bond_weight'])
+                    AssetClass.LARGE_CAP_EQUITY: equity_weight,
+                    AssetClass.GOVERNMENT_BOND: bond_weight,
+                    AssetClass.CASH: cash_weight
                 }
                 investment_strategy = DynamicStrategy(
                     base_allocation=base_allocation,
-                    max_deviation=0.2  # 20% maximum deviation from base allocation
+                    max_deviation=0.2
                 )
             
-            # Create sample contract
-            sample_contract = BaseInsuranceContract(
-                policy_number="SAMPLE001",
-                issue_date=date.today(),
-                product_type=ProductType[settings['liability']['product_type']],
-                face_amount=100000,  # Sample face amount
-                premium=1000,  # Sample annual premium
-                premium_mode=PremiumMode.ANNUAL,
-                age_at_issue=35,  # Sample age
-                sex=Sex.MALE,  # Sample sex
-                smoking_status=SmokingStatus.NON_SMOKER,
-                underwriting_class=UnderwritingClass.STANDARD
-            )
+            # Create contract
+            contract_class = {
+                'TERM': TermInsurance,
+                'WHOLE_LIFE': WholeLifeInsurance,
+                'PAR_WHOLE_LIFE': ParticipatingWholeLife,
+                'UNIVERSAL_LIFE': UniversalLife,
+                'UNIT_LINKED': UnitLinkedInsurance
+            }[settings['liability']['product_type']]
+            
+            base_params = {
+                'policy_number': "SAMPLE001",
+                'issue_date': valuation_date,
+                'term_length': int(settings['liability']['projection_years']),
+                'premium': 1000,
+                'issue_age': 35,
+                'sex': Sex.MALE,
+                'smoking_status': SmokingStatus.NON_SMOKER,
+                'occupation_class': OccupationClass.PROFESSIONAL,
+                'underwriting_class': UnderwritingClass.STANDARD,
+                'premium_mode': getattr(PremiumMode, settings['liability']['premium_mode'])
+            }
+            
+            # Create specific contract type
+            if settings['liability']['product_type'] == 'TERM':
+                sample_contract = contract_class(
+                    face_amount=100000,
+                    **base_params
+                )
+            elif settings['liability']['product_type'] == 'WHOLE_LIFE':
+                sample_contract = contract_class(
+                    face_amount=100000,
+                    guaranteed_rate=float(settings['assumptions']['inflation_base_rate']),
+                    **base_params
+                )
+            elif settings['liability']['product_type'] == 'PAR_WHOLE_LIFE':
+                sample_contract = contract_class(
+                    face_amount=100000,
+                    guaranteed_rate=float(settings['assumptions']['inflation_base_rate']),
+                    dividend_option=DividendOption.CASH,
+                    dividend_scale=float(settings['assumptions']['inflation_base_rate']) + 0.02,
+                    **base_params
+                )
+            elif settings['liability']['product_type'] == 'UNIVERSAL_LIFE':
+                sample_contract = contract_class(
+                    initial_face_amount=100000,
+                    min_guaranteed_rate=float(settings['assumptions']['inflation_base_rate']) - 0.01,
+                    current_credited_rate=float(settings['assumptions']['inflation_base_rate']) + 0.01,
+                    cost_of_insurance={i: 0.001 * (1.05 ** i) for i in range(int(settings['liability']['projection_years']))},
+                    **base_params
+                )
+            else:  # UNIT_LINKED
+                sample_contract = contract_class(
+                    initial_face_amount=100000,
+                    investment_strategy='BALANCED',
+                    fund_allocation={
+                        'equity': equity_weight,
+                        'bond': bond_weight
+                    },
+                    fund_charges={'equity': 0.015, 'bond': 0.01},
+                    **base_params
+                )
             
             # Create and initialize liability model
             mortality_table = create_sample_mortality_table()
@@ -292,22 +700,96 @@ class ModelInputGUI:
             liability_model = LiabilityModel(
                 mortality_table=mortality_table,
                 lapse_assumption=lapse_assumption,
-                inflation_assumption=inflation_assumption
+                inflation_assumption=inflation_assumption,
+                investment_returns=None
             )
             
-            # Add the sample contract to the model
+            # Add contract and project cash flows
             liability_model.add_contract(sample_contract)
-            
-            # Project cash flows
             projection = liability_model.project_cashflows(
-                valuation_date=date.today(),
-                projection_years=settings['liability']['projection_years']
+                valuation_date=valuation_date,
+                projection_years=int(settings['liability']['projection_years'])
             )
             
-            messagebox.showinfo("Success", "Model executed successfully!")
+            # Convert projection to DataFrame
+            df = projection.to_dataframe()
+            
+            # Add summary statistics
+            summary_df = pd.DataFrame({
+                'Metric': [
+                    'Total Premium',
+                    'Total Death Benefits',
+                    'Total Surrender Value',
+                    'Total Expenses',
+                    'Total Dividends',
+                    'Total Policy Loans',
+                    'Total Loan Repayments',
+                    'Total Withdrawals'
+                ],
+                'Value': [
+                    df['Premium'].sum(),
+                    df['Death_Benefit'].sum(),
+                    df['Surrender'].sum(),
+                    df['Expenses'].sum(),
+                    df['Dividends'].sum(),
+                    df['Policy_Loans'].sum(),
+                    df['Loan_Repayments'].sum(),
+                    df['Withdrawals'].sum()
+                ]
+            })
+            
+            # Create Excel writer
+            timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+            filename = f'model_results_{timestamp}.xlsx'
+            
+            with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                # Write settings to first sheet
+                pd.DataFrame([
+                    ['Asset Settings', ''],
+                    ['Strategy', settings['asset']['strategy']],
+                    ['Equity Weight', settings['asset']['equity_weight']],
+                    ['Bond Weight', settings['asset']['bond_weight']],
+                    ['Target Year', settings['asset']['target_year']],
+                    ['', ''],
+                    ['Liability Settings', ''],
+                    ['Product Type', settings['liability']['product_type']],
+                    ['Projection Years', settings['liability']['projection_years']],
+                    ['Premium Mode', settings['liability']['premium_mode']],
+                    ['', ''],
+                    ['Assumption Settings', ''],
+                    ['Mortality Improvement', settings['assumptions']['mortality_improvement']],
+                    ['Lapse Study Start', settings['assumptions']['lapse_study_start']],
+                    ['Inflation Base Rate', settings['assumptions']['inflation_base_rate']]
+                ], columns=['Setting', 'Value']).to_excel(writer, sheet_name='Settings', index=False)
+                
+                # Write summary to second sheet
+                summary_df.to_excel(writer, sheet_name='Summary', index=False)
+                
+                # Write detailed projections to third sheet
+                df.to_excel(writer, sheet_name='Projections', index=False)
+            
+            messagebox.showinfo("Success", f"Results exported to {filename}")
             
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to run model: {str(e)}")
+            messagebox.showerror("Export Error", f"Failed to export results: {str(e)}")
+    
+    def init_variables(self):
+        """Initialize all input variables with default values."""
+        # Asset strategy variables
+        self.asset_strategy = tk.StringVar(value='Dynamic')
+        self.equity_weight = tk.StringVar(value='0.6')
+        self.bond_weight = tk.StringVar(value='0.4')
+        self.target_year = tk.StringVar(value='2050')
+        
+        # Liability variables
+        self.product_type = tk.StringVar(value='PAR_WHOLE_LIFE')
+        self.projection_years = tk.StringVar(value='50')
+        self.premium_pattern = tk.StringVar(value='ANNUAL')
+        
+        # Assumption variables
+        self.mortality_improvement = tk.BooleanVar(value=True)
+        self.lapse_study_start = tk.StringVar(value=pd.Timestamp.today().strftime('%Y-%m-%d'))  # Use today's date as default
+        self.inflation_base_rate = tk.StringVar(value='0.02')
     
     def run(self):
         """Start the GUI."""
