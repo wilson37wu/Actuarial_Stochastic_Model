@@ -17,6 +17,10 @@ except ImportError:
     os.system("pip install openpyxl")
     import openpyxl
 
+from src.enums import (
+    Sex, SmokingStatus, OccupationClass,
+    UnderwritingClass, ProductType, PremiumMode, DividendOption
+)
 from src.model_gui import ModelInputGUI
 
 if __name__ == "__main__":

@@ -9,18 +9,18 @@ import os
 from datetime import date
 import pandas as pd
 
-from .enums import (
+from src.enums import (
     Sex, SmokingStatus, OccupationClass,
     UnderwritingClass, ProductType, AssetClass, PremiumMode, DividendOption
 )
-from .actuarial_assumptions import (
+from src.actuarial_assumptions import (
     create_sample_mortality_table,
     create_sample_lapse_assumption,
     create_sample_inflation_assumption
 )
-from .investment import TargetDateStrategy, DynamicStrategy
-from .liability import LiabilityModel
-from .products import (
+from src.investment import TargetDateStrategy, DynamicStrategy
+from src.liability import LiabilityModel
+from src.products import (
     BaseInsuranceContract, TermInsurance, WholeLifeInsurance,
     ParticipatingWholeLife, UniversalLife, UnitLinkedInsurance
 )
@@ -62,7 +62,10 @@ class ToolTip:
 
 class ModelInputGUI:
     """GUI for managing model inputs."""
-    
+    print("Importing PremiumMode in class")  # Debug print
+    from src.enums import PremiumMode  # Try importing here
+    print("PremiumMode imported in class:", PremiumMode)  # Verify import
+
     def __init__(self):
         """Initialize the GUI."""
         self.root = tk.Tk()
@@ -212,6 +215,13 @@ class ModelInputGUI:
     
     def create_liability_inputs(self):
         """Create liability projection input fields."""
+        import sys
+        print("Python path:", sys.path)  # Show Python's import path
+        from src.enums import PremiumMode  # Try importing here
+        print("PremiumMode imported:", PremiumMode)  # Verify import
+        print("PremiumMode values:", [p.name for p in PremiumMode])  # Show values
+
+        print("PremiumMode values:", [p.name for p in PremiumMode])  # Debug print
         frame = ttk.LabelFrame(self.liability_tab, text="Liability Settings")
         frame.pack(fill='x', padx=10, pady=5)
         
@@ -236,7 +246,7 @@ class ModelInputGUI:
         
         # Premium mode
         self.create_styled_label(frame, "Premium Mode:", 2, 0)
-        self.create_styled_combobox(frame, self.premium_pattern, [p.name for p in PremiumMode], 2, 1)
+        self.create_styled_combobox(frame, self.premium_mode, [p.name for p in PremiumMode], 2, 1)
         
         # Configure grid weights
         frame.columnconfigure(1, weight=1)
@@ -338,7 +348,7 @@ class ModelInputGUI:
             'liability': {
                 'product_type': self.product_type.get(),
                 'projection_years': self.projection_years.get(),
-                'premium_mode': self.premium_pattern.get()  # Renamed key to match its purpose
+                'premium_mode': self.premium_mode.get()  # Renamed key to match its purpose
             },
             'assumptions': {
                 'mortality_improvement': self.mortality_improvement.get(),
@@ -376,7 +386,7 @@ class ModelInputGUI:
             # Update liability settings
             self.product_type.set(settings['liability']['product_type'])
             self.projection_years.set(settings['liability']['projection_years'])
-            self.premium_pattern.set(settings['liability']['premium_mode'])  # Renamed key to match its purpose
+            self.premium_mode.set(settings['liability']['premium_mode'])  # Renamed key to match its purpose
             
             # Update assumption settings
             self.mortality_improvement.set(settings['assumptions']['mortality_improvement'])
@@ -813,7 +823,7 @@ class ModelInputGUI:
         # Liability variables
         self.product_type = tk.StringVar(value='PAR_WHOLE_LIFE')
         self.projection_years = tk.StringVar(value='50')
-        self.premium_pattern = tk.StringVar(value='ANNUAL')
+        self.premium_mode = tk.StringVar(value='ANNUAL')
         self.face_amount = tk.StringVar(value='1000000')
         self.premium = tk.StringVar(value='10000')
         
