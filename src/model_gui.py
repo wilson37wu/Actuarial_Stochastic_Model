@@ -204,6 +204,11 @@ class ModelInputGUI:
         
         # Configure grid weights
         frame.columnconfigure(1, weight=1)
+
+        # Projection years
+        self.create_styled_label(frame, "Projection Years:", 4, 0)
+        proj_years_entry = self.create_styled_entry(frame, self.projection_years_asset, 4, 1)
+        ToolTip(proj_years_entry, "Number of years to project asset returns")
     
     def create_liability_inputs(self):
         """Create liability projection input fields."""
@@ -214,6 +219,16 @@ class ModelInputGUI:
         self.create_styled_label(frame, "Product Type:", 0, 0)
         self.create_styled_combobox(frame, self.product_type, [p.name for p in ProductType], 0, 1)
         
+        # Face amount
+        self.create_styled_label(frame, "Face Amount:", 1, 0)
+        face_amount_entry = self.create_styled_entry(frame, self.face_amount, 1, 1)
+        ToolTip(face_amount_entry, "Face amount of the insurance policy")
+
+        # Premium
+        self.create_styled_label(frame, "Premium:", 2, 0)
+        premium_entry = self.create_styled_entry(frame, self.premium, 2, 1)
+        ToolTip(premium_entry, "Premium amount")
+
         # Projection years
         self.create_styled_label(frame, "Projection Years:", 1, 0)
         projection_years_entry = self.create_styled_entry(frame, self.projection_years, 1, 1)
@@ -238,7 +253,22 @@ class ModelInputGUI:
         self.create_styled_label(frame, "Lapse Study Start:", 1, 0)
         lapse_study_start_entry = self.create_styled_entry(frame, self.lapse_study_start, 1, 1)
         ToolTip(lapse_study_start_entry, "Start date of the lapse study (YYYY-MM-DD)")
-        
+                
+        # Mortality multiplier
+        self.create_styled_label(frame, "Mortality Multiplier:", 1, 0)
+        mort_mult_entry = self.create_styled_entry(frame, self.mortality_multiplier, 1, 1)
+        ToolTip(mort_mult_entry, "Multiplier applied to base mortality rates")
+
+        # Base lapse rate
+        self.create_styled_label(frame, "Base Lapse Rate:", 2, 0)
+        base_lapse_entry = self.create_styled_entry(frame, self.base_lapse_rate, 2, 1)
+        ToolTip(base_lapse_entry, "Base annual lapse rate")
+
+        # Shock lapse
+        self.create_styled_label(frame, "Shock Lapse Rate:", 3, 0)
+        shock_lapse_entry = self.create_styled_entry(frame, self.shock_lapse, 3, 1)
+        ToolTip(shock_lapse_entry, "Shock lapse rate at end of surrender charge period")
+
         # Inflation base rate
         self.create_styled_label(frame, "Base Inflation Rate:", 2, 0)
         inflation_base_rate_entry = self.create_styled_entry(frame, self.inflation_base_rate, 2, 1)
@@ -253,9 +283,7 @@ class ModelInputGUI:
         button_frame.pack(fill='x', padx=10, pady=5)
         
         # Create custom button style
-        self.root.tk.call('ttk::style', 'configure', 'Export.TButton',
-                         font=('Helvetica', 10, 'bold'),
-                         foreground='green')
+        self.style.configure('Export.TButton', font=('Helvetica', 10, 'bold'), foreground='green')
         
         button_style = {
             'style': 'Custom.TButton',
@@ -776,6 +804,7 @@ class ModelInputGUI:
     def init_variables(self):
         """Initialize all input variables with default values."""
         # Asset strategy variables
+        self.projection_years_asset = tk.StringVar(value='30')
         self.asset_strategy = tk.StringVar(value='Dynamic')
         self.equity_weight = tk.StringVar(value='0.6')
         self.bond_weight = tk.StringVar(value='0.4')
@@ -785,11 +814,16 @@ class ModelInputGUI:
         self.product_type = tk.StringVar(value='PAR_WHOLE_LIFE')
         self.projection_years = tk.StringVar(value='50')
         self.premium_pattern = tk.StringVar(value='ANNUAL')
+        self.face_amount = tk.StringVar(value='1000000')
+        self.premium = tk.StringVar(value='10000')
         
         # Assumption variables
         self.mortality_improvement = tk.BooleanVar(value=True)
+        self.mortality_multiplier = tk.StringVar(value='1.0')
+        self.base_lapse_rate = tk.StringVar(value='0.05')
+        self.shock_lapse = tk.StringVar(value='0.15')
         self.lapse_study_start = tk.StringVar(value=pd.Timestamp.today().strftime('%Y-%m-%d'))  # Use today's date as default
-        self.inflation_base_rate = tk.StringVar(value='0.02')
+        self.inflation_base_rate = tk.StringVar(value='0.02')       
     
     def run(self):
         """Start the GUI."""
