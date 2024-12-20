@@ -62,6 +62,24 @@ class MortalityTable:
             bounds_error=False, fill_value=(rates[0], rates[-1])
         )
     
+    def apply_multiplier(self, multiplier: float) -> None:
+        """Apply a multiplier to all mortality rates.
+        
+        Args:
+            multiplier: Factor to multiply all rates by
+        """
+        if multiplier <= 0:
+            raise ValueError("Mortality multiplier must be positive")
+        
+        # Apply multiplier to base rates
+        self.base_rates = {
+            age: rate * multiplier
+            for age, rate in self.base_rates.items()
+        }
+        
+        # Recreate interpolator with new rates
+        self._create_interpolator()
+    
     def get_rate(self,
                  age: int,
                  sex: Sex,

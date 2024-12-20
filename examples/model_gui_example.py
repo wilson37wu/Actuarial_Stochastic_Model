@@ -21,7 +21,9 @@ from src.enums import (
     Sex, SmokingStatus, OccupationClass,
     UnderwritingClass, ProductType, PremiumMode, DividendOption
 )
-from src.model_gui import ModelInputGUI
+# You can use either of these imports:
+from src.model_gui import ModelInputGUI  # Backward compatible way
+# from src.gui.main import ModelGUI as ModelInputGUI  # New way
 
 if __name__ == "__main__":
     gui = ModelInputGUI()
