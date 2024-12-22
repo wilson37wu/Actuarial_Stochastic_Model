@@ -33,15 +33,6 @@ class InvestmentStrategy(Enum):
     AGGRESSIVE = auto()     # High risk, mostly stocks
     LIFECYCLE = auto()      # Age-based allocation
 
-class PremiumMode(Enum):
-    """Premium payment modes."""
-    ANNUAL = auto()
-    SEMI_ANNUAL = auto()
-    QUARTERLY = auto()
-    MONTHLY = auto()
-    SINGLE = auto()
-    FLEXIBLE = auto()
-
 class PremiumStatus(Enum):
     """Premium payment status."""
     PAYING = auto()
@@ -199,6 +190,7 @@ class TermInsurance(BaseInsuranceContract):
         super().__init__(**kwargs)
         self.face_amount = face_amount
         self.product_type = ProductType.TERM
+        self.loans: List[PolicyLoan] = []  # Added loans list
 
 class WholeLifeInsurance(BaseInsuranceContract):
     """Whole life insurance contract."""
@@ -212,6 +204,22 @@ class WholeLifeInsurance(BaseInsuranceContract):
         self.product_type = ProductType.WHOLE_LIFE
         self.cash_values: Dict[int, float] = {}
         self.loans: List[PolicyLoan] = []
+        self.premium_status = PremiumStatus.PAYING  # Initialize premium status
+    
+    def is_active(self, valuation_date: date) -> bool:
+        """Check if policy is active at valuation date."""
+        if isinstance(valuation_date, pd.Timestamp):
+            valuation_date = valuation_date.date()
+        
+        # For whole life policies, they are active until death/surrender
+        # Term length is not applicable
+        duration = (valuation_date - self.issue_date).days / 365.25
+        
+        # Check if policy has lapsed or surrendered
+        if self.premium_status in [PremiumStatus.LAPSED]:
+            return False
+        
+        return True
     
     def calculate_nonforfeiture_values(self, 
                                      duration: int,
@@ -283,8 +291,8 @@ class ParticipatingWholeLife(WholeLifeInsurance):
             
             self.asset_share = (
                 previous_asset_share * (1 + investment_return) +
-                premium * (1 - expense_rate) -
-                self.face_amount * mortality_rate -
+                premium * (1 - expense_rate) - 
+                self.face_amount * mortality_rate - 
                 sum(div.amount for div in self.dividend_history
                     if div.declaration_date.year == self.issue_date.year + duration - 1)
             )
@@ -357,6 +365,7 @@ class UnitLinkedInsurance(BaseInsuranceContract):
         self.unit_holdings: Dict[str, float] = {}
         self.nav_history: Dict[Tuple[date, str], float] = {}
         self.switches: Dict[date, Dict[str, float]] = {}
+        self.loans: List[PolicyLoan] = []  # Added loans list
         
         # Target date strategy if applicable
         self.target_date_strategy = None

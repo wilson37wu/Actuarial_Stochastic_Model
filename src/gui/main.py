@@ -15,7 +15,7 @@ from .styles import configure_styles
 from .tabs import AssetTab, LiabilityTab, AssumptionsTab
 from ..enums import (
     Sex, SmokingStatus, OccupationClass, UnderwritingClass,
-    ProductType, DividendOption, AssetClass
+    ProductType, DividendOption, AssetClass, PremiumMode
 )
 from ..liability import LiabilityModel
 from ..products import (
@@ -262,42 +262,31 @@ class ModelGUI:
             }, index=dates)
             asset_model.set_economic_scenarios(scenarios)
             
-            # Create insurance product
-            product_type = self.variables['product_type'].get()
-            face_amount = float(self.variables['face_amount'].get())
-            premium = float(self.variables['premium'].get())
+            # Create sample contract based on inputs
+            contract = WholeLifeInsurance(
+                face_amount=float(self.variables['face_amount'].get()),
+                guaranteed_rate=0.03,  # 3% guaranteed rate
+                issue_date=date.today(),
+                issue_age=35,
+                sex=Sex.MALE,
+                smoking_status=SmokingStatus.NON_SMOKER,
+                underwriting_class=UnderwritingClass.STANDARD,
+                occupation_class=OccupationClass.PROFESSIONAL,
+                premium=float(self.variables['premium'].get()),
+                premium_mode=PremiumMode.ANNUAL,
+                policy_number='WL' + datetime.now().strftime('%Y%m%d%H%M'),
+                term_length=None  # Whole life has no term
+            )
             
-            base_params = {
-                'policy_number': '12345',  # Example policy number
-                'issue_date': date.today(),
-                'term_length': 20,  # Example term length
-                'premium': premium,
-                'issue_age': 35,  # Example issue age
-                'sex': Sex.MALE,  # Example sex
-                'smoking_status': SmokingStatus.NON_SMOKER,  # Example smoking status
-                'occupation_class': OccupationClass.PROFESSIONAL,  # Example occupation class
-                'underwriting_class': UnderwritingClass.STANDARD,  # Example underwriting class
-            }
-            
-            if product_type == 'Term':
-                product = TermInsurance(
-                    face_amount=face_amount,
-                    **base_params
-                )
-            elif product_type == 'WholeLife':
-                product = WholeLifeInsurance(
-                    face_amount=face_amount,
-                    guaranteed_rate=0.03,  # Example guaranteed rate
-                    **base_params
-                )
-            
-            # Create and run liability model
+            # Create liability model
             liability_model = LiabilityModel(
                 mortality_table=mortality_table,
                 lapse_assumption=lapse_assumption,
                 inflation_assumption=inflation_assumption
             )
-            liability_model.add_contract(product)
+            
+            # Add contract to liability model
+            liability_model.add_contract(contract)
             
             liability_results = liability_model.project_cashflows(
                 valuation_date=date.today(),
