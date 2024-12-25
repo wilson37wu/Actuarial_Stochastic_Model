@@ -1,0 +1,164 @@
+# Actuarial Stochastic Model Project Documentation
+Generated on: 2024-12-23 01:29:46
+
+## Project Overview
+This document summarizes the development of an Actuarial Stochastic Model using Python. The project implements a comprehensive actuarial modeling system with both liability and asset projections, featuring a GUI interface for user interaction.
+
+## Key Components Developed
+
+### 1. Core Modeling Components
+- Liability Model for insurance contract projections
+- Asset Model for investment portfolio management
+- ALM Engine for integrated asset-liability modeling
+- Economic Scenario Generator
+
+### 2. Insurance Products
+- Term Insurance
+- Whole Life Insurance
+- Universal Life
+- Unit-Linked Insurance
+- Participating Whole Life
+
+### 3. GUI Application
+- Asset Projection Tab
+- Liability Projection Tab
+- Actuarial Assumptions Tab
+- Export functionality for results
+
+## Development Timeline
+
+### Phase 1: Core Framework Setup
+1. Created basic project structure
+2. Implemented base insurance contract classes
+3. Set up mortality and other actuarial assumptions
+
+### Phase 2: Asset Model Development
+1. Implemented fixed income modeling
+2. Added equity modeling capabilities
+3. Created portfolio management functionality
+
+### Phase 3: Liability Model Enhancement
+1. Added various insurance product types
+2. Implemented cash flow projections
+3. Added premium and policy loan handling
+
+### Phase 4: GUI Development
+1. Created main application interface
+2. Added input validation
+3. Implemented results export functionality
+
+### Phase 5: Integration and Testing
+1. Connected liability and asset models
+2. Added economic scenario generation
+3. Implemented combined cash flow projections
+
+## Recent Changes and Fixes
+
+### GUI Enhancement (2024-12-23)
+1. Fixed liability cash flow projections
+2. Added proper contract creation in GUI
+3. Enhanced export functionality
+4. Fixed whole life policy handling
+
+### Investment Integration (2024-12-23)
+1. Added economic scenario setup
+2. Implemented investment portfolio creation
+3. Enhanced export functionality with investment results
+
+## Technical Details
+
+### Key Classes
+1. ModelGUI
+   - Main GUI application class
+   - Handles user input and model execution
+   - Manages result export
+
+2. LiabilityModel
+   - Projects insurance contract cash flows
+   - Handles multiple types of insurance products
+   - Manages actuarial assumptions
+
+3. AssetModel
+   - Manages investment portfolio
+   - Projects investment cash flows
+   - Handles different asset types
+
+4. WholeLifeInsurance
+   - Implements whole life insurance functionality
+   - Handles premium payments and policy values
+   - Manages policy status
+
+### Important Methods
+1. run_model()
+   - Creates insurance contracts
+   - Sets up economic scenarios
+   - Projects cash flows
+   - Exports results
+
+2. project_cashflows()
+   - Projects liability cash flows
+   - Handles different time steps
+   - Accumulates cash flows across contracts
+
+3. export_to_excel()
+   - Exports both liability and investment results
+   - Creates formatted Excel workbook
+   - Handles multiple result types
+
+## Testing and Validation
+- Input validation for face amount and premium
+- Error handling for missing parameters
+- Validation of asset allocation weights
+- Testing of cash flow projections
+
+## Future Enhancements
+1. Additional unit tests
+2. Enhanced error logging
+3. More detailed documentation
+4. Additional product features
+
+## Known Issues and Resolutions
+1. Zero liability cash flows
+   - Fixed by adding proper contract creation
+   - Added missing premium status initialization
+   - Fixed whole life policy term handling
+
+2. Export formatting
+   - Added timestamps to prevent file overwrites
+   - Enhanced Excel formatting
+   - Added multiple sheets for different results
+
+## Dependencies
+- pandas: Data manipulation and Excel handling
+- tkinter: GUI framework
+- numpy: Numerical computations
+- openpyxl: Excel file handling
+
+## Configuration
+- Economic scenario parameters
+- Actuarial assumptions
+- GUI layout and styling
+- Export formatting
+
+## Usage Instructions
+1. Run the GUI application
+2. Enter policy parameters
+3. Set asset allocation
+4. Run model
+5. Export results
+
+## Error Handling
+- Input validation
+- Runtime error catching
+- Detailed error messages
+- Logging of operations
+
+## Best Practices Implemented
+1. Code organization
+2. Error handling
+3. User input validation
+4. Result formatting
+5. Documentation
+
+## Conclusion
+The Actuarial Stochastic Model project provides a comprehensive solution for actuarial modeling with both liability and asset projections. The GUI interface makes it accessible to users while maintaining robust mathematical and financial calculations underneath.

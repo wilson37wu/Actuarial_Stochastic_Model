@@ -110,6 +110,56 @@ Implementation of a stochastic model for insurance contract liability evaluation
    - Audit trail
    - Change control
 
+## Recent Updates
+
+### December 2024 Updates
+- Enhanced liability projection capabilities with adjustable parameters:
+  - Mortality multiplier for sensitivity testing
+  - Base lapse rate adjustments
+  - Inflation rate scenarios
+- Improved investment portfolio management:
+  - Added bond portfolio tracking in FixedIncomeModel
+  - Enhanced equity allocation strategies
+  - Integrated dynamic asset allocation updates
+- Enhanced dashboard visualization:
+  - Split liability projections into net and present value views
+  - Added detailed cash flow component analysis
+  - Improved portfolio composition display
+
+## Features
+
+### Dashboard Components
+1. **Liability Analysis**
+   - Interactive mortality, lapse, and inflation adjustments
+   - Net liability and present value projections
+   - Detailed cash flow component breakdown
+   
+2. **Investment Analysis**
+   - Fixed income portfolio management
+   - Equity allocation strategies
+   - Dynamic portfolio rebalancing
+   
+3. **Asset-Liability Management**
+   - Integrated asset-liability projections
+   - Dynamic hedging strategies
+   - Risk metric calculations
+
+### Model Components
+1. **Fixed Income Model**
+   - Bond portfolio management
+   - Credit transition modeling
+   - Default recovery calculations
+   
+2. **Equity Model**
+   - Return projections
+   - Dividend modeling
+   - Volatility adjustments
+
+3. **Liability Model**
+   - Mortality assumptions
+   - Lapse behavior
+   - Inflation impacts
+
 ## Data Specifications
 
 ### Economic Scenarios

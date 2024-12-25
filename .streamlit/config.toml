@@ -1,0 +1,12 @@
+[theme]
+primaryColor = "#FF4B4B"  # Bright red for interactive elements
+backgroundColor = "#FFFFFF"  # White background
+secondaryBackgroundColor = "#FFE6E6"  # Light pink background for containers
+textColor = "#000000"  # Black text
+font = "sans serif"
+
+[server]
+enableXsrfProtection = false  # Disable XSRF for local development
+
+[browser]
+gatherUsageStats = false  # Disable usage statistics

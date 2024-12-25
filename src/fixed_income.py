@@ -24,6 +24,23 @@ class FixedIncomeModel:
         self.config = config
         self.credit_transition_matrix = self._load_credit_transition_matrix()
         self.default_recovery_rates = self._load_recovery_rates()
+        self.bonds: List[Bond] = []
+        
+    def add_bond(self, bond: Bond) -> None:
+        """Add a bond to the portfolio.
+        
+        Args:
+            bond: Bond to add
+        """
+        self.bonds.append(bond)
+        
+    def add_bonds(self, bonds: List[Bond]) -> None:
+        """Add multiple bonds to the portfolio.
+        
+        Args:
+            bonds: List of bonds to add
+        """
+        self.bonds.extend(bonds)
         
     def _load_credit_transition_matrix(self) -> pd.DataFrame:
         """Load credit rating transition matrix."""
@@ -177,3 +194,43 @@ class FixedIncomeModel:
             price += cf_amount * pv_factor
             
         return convexity / price / (1 + yield_rate) ** 2
+
+    def project_returns(self, n_periods: int = 12) -> pd.Series:
+        """Project fixed income returns.
+        
+        Args:
+            n_periods: Number of periods to project
+        
+        Returns:
+            Series of projected returns
+        """
+        # Calculate weighted average yield
+        total_value = sum(bond.par_value for bond in self.bonds)
+        weighted_yield = sum(
+            bond.coupon_rate * bond.par_value / total_value 
+            for bond in self.bonds
+        ) if total_value > 0 else 0.04  # Default to 4% if no bonds
+        
+        # Generate returns with low volatility around the yield
+        base_returns = np.random.normal(
+            loc=weighted_yield / 12,  # Monthly yield
+            scale=0.002,  # Low volatility
+            size=n_periods
+        )
+        
+        # Add credit spread variations
+        credit_spreads = np.random.normal(0, 0.001, n_periods)
+        
+        returns = base_returns + credit_spreads
+        
+        return pd.Series(returns, name='Fixed Income Returns')
+
+    def update_parameters(self, config: Dict) -> None:
+        """Update model parameters.
+        
+        Args:
+            config: New configuration parameters
+        """
+        self.config.update(config)
+        self.credit_transition_matrix = self._load_credit_transition_matrix()
+        self.default_recovery_rates = self._load_recovery_rates()

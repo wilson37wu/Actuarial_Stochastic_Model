@@ -1,6 +1,10 @@
 """
 Example script demonstrating the liability model with various product features.
 """
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from datetime import date, timedelta
 from typing import Dict, List
 
@@ -10,15 +14,18 @@ import pandas as pd
 import seaborn as sns
 
 from src.actuarial_assumptions import (
-    MortalityTable, LapseAssumption, InflationAssumption,
-    Sex, SmokingStatus, OccupationClass, UnderwritingClass
+    MortalityTable, LapseAssumption, InflationAssumption
+)
+from src.enums import (
+    Sex, UnderwritingClass, SmokingStatus, OccupationClass,
+    ProductType, DividendOption, InvestmentStrategy, PremiumMode, NonForfeitureOption
 )
 from src.products import (
-    ProductType, PremiumMode, NonForfeitureOption, DividendOption,
     TermInsurance, WholeLifeInsurance, ParticipatingWholeLife,
     UniversalLife, UnitLinkedInsurance
 )
 from src.liability import LiabilityModel
+from src.gcv_calculator import GCVParameters, GradingPattern, ProductVariant
 
 # Set up assumptions
 mortality = MortalityTable(
@@ -115,7 +122,7 @@ par_whole_life = ParticipatingWholeLife(
     occupation_class=OccupationClass.TECHNICAL,
     underwriting_class=UnderwritingClass.STANDARD,
     guaranteed_rate=0.03,
-    dividend_option=DividendOption.ADDITIONS,
+    dividend_option=DividendOption.PAID_UP_ADDITIONS,
     dividend_scale=0.8,
     nonforfeiture_option=NonForfeitureOption.REDUCED_PAID_UP
 )
@@ -139,12 +146,12 @@ ul = UniversalLife(
     },
     min_premium=500,
     max_premium=5000,
-    premium_mode=PremiumMode.FLEXIBLE
+    premium_mode=PremiumMode.MONTHLY  
 )
 
 # Unit-Linked with Target Date Strategy
 unit_linked = UnitLinkedInsurance(
-    policy_number="UL001",
+    policy_number="UL002",
     issue_date=valuation_date,
     term_length=95,
     premium=2000,
@@ -166,7 +173,79 @@ unit_linked = UnitLinkedInsurance(
         "INTERNATIONAL_EQUITY": 0.007,
         "CORPORATE_BOND": 0.004,
         "MONEY_MARKET": 0.002
+    },
+    premium_mode=PremiumMode.MONTHLY  
+)
+
+# Create sample GCV parameters for different product variants
+standard_gcv_params = GCVParameters(
+    base_percentage=0.7,
+    initial_gcv_percentage=0.5,
+    grading_years=10,
+    minimum_gcv_percentage=0.05,
+    grading_pattern=GradingPattern.LINEAR,
+    product_variant=ProductVariant.STANDARD
+)
+
+high_early_value_params = GCVParameters(
+    base_percentage=0.8,
+    initial_gcv_percentage=0.6,
+    grading_years=12,
+    minimum_gcv_percentage=0.06,
+    grading_pattern=GradingPattern.S_CURVE,
+    product_variant=ProductVariant.HIGH_EARLY_VALUE
+)
+
+level_gcv_params = GCVParameters(
+    base_percentage=0.75,
+    initial_gcv_percentage=0.55,
+    grading_years=15,
+    minimum_gcv_percentage=0.07,
+    grading_pattern=GradingPattern.STEPWISE,
+    product_variant=ProductVariant.LEVEL_GCV,
+    stepwise_points={
+        0: 1.0,
+        5: 0.8,
+        10: 0.6,
+        15: 0.4
     }
+)
+
+# Create sample contracts with different GCV parameters
+standard_wl = WholeLifeInsurance(
+    policy_number="WL001",
+    issue_date=date(2024, 1, 1),
+    face_amount=100000,
+    issue_age=35,
+    sex=Sex.MALE,
+    smoking_status=SmokingStatus.NON_SMOKER,
+    occupation_class=OccupationClass.STANDARD,
+    product_variant=ProductVariant.STANDARD,
+    gcv_parameters=standard_gcv_params
+)
+
+high_early_wl = WholeLifeInsurance(
+    policy_number="WL002",
+    issue_date=date(2024, 1, 1),
+    face_amount=100000,
+    issue_age=35,
+    sex=Sex.FEMALE,
+    smoking_status=SmokingStatus.NON_SMOKER,
+    occupation_class=OccupationClass.STANDARD,
+    product_variant=ProductVariant.HIGH_EARLY_VALUE,
+    gcv_parameters=high_early_value_params
+)
+
+level_wl = WholeLifeInsurance(
+    policy_number="WL003",
+    issue_date=date(2024, 1, 1),
+    face_amount=100000,
+    issue_age=35,
+    sex=Sex.MALE,
+    smoking_status=SmokingStatus.NON_SMOKER,
+    occupation_class=OccupationClass.STANDARD,
+    product_variant=ProductVariant.LEVEL_GCV,
+    gcv_parameters=level_gcv_params
 )
 
 # Create and run liability model
@@ -183,12 +262,15 @@ model.add_contract(whole_life)
 model.add_contract(par_whole_life)
 model.add_contract(ul)
 model.add_contract(unit_linked)
+model.add_contract(standard_wl)
+model.add_contract(high_early_wl)
+model.add_contract(level_wl)
 
 # Project cash flows
 projection = model.project_cashflows(
     valuation_date=valuation_date,
-    projection_years=10,
-    time_step='M'  # Monthly projections
+    projection_years=30,
+    time_step='M'
 )
 
 # Calculate present values
@@ -231,7 +313,24 @@ def plot_cashflows(projection: pd.DataFrame, filename: str):
 
 # Plot results
 df = projection.to_dataframe()
+df.index = pd.to_datetime(df.index)  # Convert index to datetime
 plot_cashflows(df, 'cashflow_projection.png')
+
+# Plot cash flows by product variant
+for contract in model.contracts:
+    if contract.product_type == ProductType.WHOLE_LIFE:
+        contract_df = df[df['Policy_Number'] == contract.policy_number]
+        plt.figure(figsize=(12, 6))
+        plt.plot(contract_df.index, contract_df['Surrender'], label='Surrender Value')
+        plt.plot(contract_df.index, contract_df['Death_Benefit'], label='Death Benefit')
+        plt.plot(contract_df.index, contract_df['Dividends'], label='Dividends')
+        plt.title(f'Cash Flows - {contract.product_variant.value}')
+        plt.xlabel('Date')
+        plt.ylabel('Amount')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f'cashflow_projection_{contract.product_variant.value}.png')
+        plt.close()
 
 # Export to Excel
 writer = pd.ExcelWriter('liability_projection.xlsx', engine='openpyxl')
@@ -254,5 +353,34 @@ product_mix = pd.DataFrame({
     'Issue_Age': [c.issue_age for c in model.contracts]
 })
 product_mix.to_excel(writer, sheet_name='Product_Mix')
+
+# Monthly cash flows by variant
+for contract in model.contracts:
+    if contract.product_type == ProductType.WHOLE_LIFE:
+        contract_df = df[df['Policy_Number'] == contract.policy_number]
+        sheet_name = f'Monthly_{contract.product_variant.value}'
+        contract_df.to_excel(writer, sheet_name=sheet_name)
+
+# Annual summaries by variant
+annual_df = df.resample('Y').sum()
+for contract in model.contracts:
+    if contract.product_type == ProductType.WHOLE_LIFE:
+        contract_df = annual_df[annual_df['Policy_Number'] == contract.policy_number]
+        sheet_name = f'Annual_{contract.product_variant.value}'
+        contract_df.to_excel(writer, sheet_name=sheet_name)
+
+# Present values by variant
+pv_df = pd.DataFrame({
+    'Product_Variant': [c.product_variant.value for c in model.contracts if c.product_type == ProductType.WHOLE_LIFE],
+    'Policy_Number': [c.policy_number for c in model.contracts if c.product_type == ProductType.WHOLE_LIFE],
+    'PV_Premium': [c.get_premium_pv() for c in model.contracts if c.product_type == ProductType.WHOLE_LIFE],
+    'PV_Death_Benefit': [projection.calculate_present_values(
+        discount_rates={d: 0.035 for d in df.index}
+    )['Death_Benefit'] for c in model.contracts if c.product_type == ProductType.WHOLE_LIFE],
+    'PV_Surrender': [projection.calculate_present_values(
+        discount_rates={d: 0.035 for d in df.index}
+    )['Surrender'] for c in model.contracts if c.product_type == ProductType.WHOLE_LIFE]
+})
+pv_df.to_excel(writer, sheet_name='Present_Values')
 
 writer.close()

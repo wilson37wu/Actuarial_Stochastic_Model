@@ -30,6 +30,7 @@ class OccupationClass(Enum):
     """Occupation class for underwriting."""
     PROFESSIONAL = auto()
     TECHNICAL = auto()
+    STANDARD = auto()
     MANUAL = auto()
 
 class UnderwritingClass(Enum):
@@ -67,6 +68,7 @@ class PremiumMode(Enum):
     QUARTERLY = auto()      # Four times per year
     MONTHLY = auto()        # Monthly payments
     SINGLE = auto()         # Single premium
+    FLEXIBLE = auto()  # Added FLEXIBLE mode for Universal Life policies
 
 class PremiumStatus(Enum):
     """Status of premium payments."""

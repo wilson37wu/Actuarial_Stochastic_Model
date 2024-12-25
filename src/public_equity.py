@@ -121,3 +121,37 @@ class EquityModel:
             }
             
         return metrics
+
+    def project_returns(self, n_periods: int = 12) -> pd.Series:
+        """Project equity returns.
+        
+        Args:
+            n_periods: Number of periods to project
+            
+        Returns:
+            Series of projected returns
+        """
+        expected_return = self.config.get('expected_return', 0.08)
+        volatility = self.config.get('market_volatility', 0.15)
+        
+        # Generate monthly returns using geometric Brownian motion
+        monthly_return = expected_return / 12
+        monthly_vol = volatility / np.sqrt(12)
+        
+        returns = np.random.normal(
+            loc=monthly_return - 0.5 * monthly_vol**2,
+            scale=monthly_vol,
+            size=n_periods
+        )
+        
+        return pd.Series(returns, name='Equity Returns')
+
+    def update_parameters(self, config: Dict) -> None:
+        """Update model parameters.
+        
+        Args:
+            config: New configuration parameters
+        """
+        self.config.update(config)
+        self.market_volatility = self.config.get('market_volatility', 0.15)
+        self.sector_correlations = self._load_sector_correlations()

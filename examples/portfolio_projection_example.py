@@ -11,7 +11,7 @@ from src.asset_model import AssetModel
 
 def create_sample_scenarios(start_date: date, periods: int = 1200) -> pd.DataFrame:
     """Create sample economic scenarios for testing."""
-    dates = pd.date_range(start=start_date, periods=periods, freq='ME')
+    dates = pd.date_range(start=start_date, periods=periods, freq='M')
     np.random.seed(42)  # For reproducibility
     
     # Generate correlated market returns and risk-free rates

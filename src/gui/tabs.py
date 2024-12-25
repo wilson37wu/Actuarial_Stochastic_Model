@@ -51,11 +51,11 @@ class AssetTab(ttk.Frame, StyledWidgetMixin):
         # Investment return
         self.create_styled_label(frame, "Expected Return:", 3, 0)
         return_entry = self.create_styled_entry(
-            frame,
-            self.variables['investment_return'],
+            frame, 
+            self.variables['expected_return'], 
             3, 1
         )
-        ToolTip(return_entry, "Expected annual investment return (e.g., 0.06 for 6%)")
+        ToolTip(return_entry, "Expected annual return (e.g., 0.06 for 6%)")
 
 class LiabilityTab(ttk.Frame, StyledWidgetMixin):
     """Liability projection tab."""
@@ -68,88 +68,46 @@ class LiabilityTab(ttk.Frame, StyledWidgetMixin):
     
     def create_inputs(self):
         """Create liability projection input fields."""
-        # Product details frame
-        product_frame = ttk.LabelFrame(self, text="Product Details")
-        product_frame.pack(fill='x', padx=10, pady=5)
+        frame = ttk.LabelFrame(self, text="Insurance Contract Settings")
+        frame.pack(fill='x', padx=10, pady=5)
         
         # Product type
-        self.create_styled_label(product_frame, "Product Type:", 0, 0)
+        self.create_styled_label(frame, "Product Type:", 0, 0)
         product_combo = self.create_styled_combobox(
-            product_frame,
+            frame,
             self.variables['product_type'],
-            ['Term', 'Whole Life', 'Universal Life', 'Unit Linked'],
+            ['Term', 'WholeLife', 'Universal', 'UnitLinked'],
             0, 1
         )
         ToolTip(product_combo, "Type of insurance product")
         
         # Face amount
-        self.create_styled_label(product_frame, "Face Amount:", 1, 0)
-        face_amount_entry = self.create_styled_entry(
-            product_frame,
+        self.create_styled_label(frame, "Face Amount:", 1, 0)
+        face_entry = self.create_styled_entry(
+            frame,
             self.variables['face_amount'],
             1, 1
         )
-        ToolTip(face_amount_entry, "Face amount of the insurance policy")
+        ToolTip(face_entry, "Insurance face amount")
+        
+        # Premium
+        self.create_styled_label(frame, "Premium:", 2, 0)
+        premium_entry = self.create_styled_entry(
+            frame,
+            self.variables['premium'],
+            2, 1
+        )
+        ToolTip(premium_entry, "Annual premium amount")
         
         # Premium mode
-        self.create_styled_label(product_frame, "Premium Mode:", 2, 0)
+        self.create_styled_label(frame, "Premium Mode:", 3, 0)
         mode_combo = self.create_styled_combobox(
-            product_frame,
+            frame,
             self.variables['premium_mode'],
             ['Annual', 'Semi-Annual', 'Quarterly', 'Monthly'],
-            2, 1
-        )
-        ToolTip(mode_combo, "Frequency of premium payments")
-        
-        # Dividend option
-        self.create_styled_label(product_frame, "Dividend Option:", 3, 0)
-        div_combo = self.create_styled_combobox(
-            product_frame,
-            self.variables['dividend_option'],
-            ['PaidUp', 'Cash', 'Premium Reduction'],
             3, 1
         )
-        ToolTip(div_combo, "How dividends should be handled")
-        
-        # Policyholder details frame
-        holder_frame = ttk.LabelFrame(self, text="Policyholder Details")
-        holder_frame.pack(fill='x', padx=10, pady=5)
-        
-        # Sex
-        self.create_styled_label(holder_frame, "Sex:", 0, 0)
-        sex_combo = self.create_styled_combobox(
-            holder_frame,
-            self.variables['sex'],
-            ['Male', 'Female'],
-            0, 1
-        )
-        
-        # Smoking status
-        self.create_styled_label(holder_frame, "Smoking Status:", 1, 0)
-        smoking_combo = self.create_styled_combobox(
-            holder_frame,
-            self.variables['smoking_status'],
-            ['Non-Smoker', 'Smoker'],
-            1, 1
-        )
-        
-        # Occupation class
-        self.create_styled_label(holder_frame, "Occupation Class:", 2, 0)
-        occ_combo = self.create_styled_combobox(
-            holder_frame,
-            self.variables['occupation_class'],
-            ['Standard', 'Professional', 'Manual'],
-            2, 1
-        )
-        
-        # Underwriting class
-        self.create_styled_label(holder_frame, "Underwriting Class:", 3, 0)
-        uw_combo = self.create_styled_combobox(
-            holder_frame,
-            self.variables['underwriting_class'],
-            ['Preferred', 'Standard', 'Substandard'],
-            3, 1
-        )
+        ToolTip(mode_combo, "Premium payment frequency")
 
 class AssumptionsTab(ttk.Frame, StyledWidgetMixin):
     """Actuarial assumptions tab."""
@@ -162,47 +120,32 @@ class AssumptionsTab(ttk.Frame, StyledWidgetMixin):
     
     def create_inputs(self):
         """Create actuarial assumptions input fields."""
-        # Mortality frame
-        mort_frame = ttk.LabelFrame(self, text="Mortality Assumptions")
-        mort_frame.pack(fill='x', padx=10, pady=5)
+        frame = ttk.LabelFrame(self, text="Actuarial Assumptions")
+        frame.pack(fill='x', padx=10, pady=5)
         
-        # Mortality table
-        self.create_styled_label(mort_frame, "Mortality Table:", 0, 0)
-        table_combo = self.create_styled_combobox(
-            mort_frame,
-            self.variables['mortality_table'],
-            ['2012 IAM', '2017 CSO'],
-            0, 1
-        )
-        ToolTip(table_combo, "Base mortality table to use")
-        
-        # Mortality multiplier
-        self.create_styled_label(mort_frame, "Mortality Multiplier:", 1, 0)
-        mult_entry = self.create_styled_entry(
-            mort_frame,
+        # Mortality
+        self.create_styled_label(frame, "Mortality Multiplier:", 0, 0)
+        mort_entry = self.create_styled_entry(
+            frame,
             self.variables['mortality_multiplier'],
-            1, 1
-        )
-        ToolTip(mult_entry, "Multiplier applied to base mortality rates")
-        
-        # Other assumptions frame
-        other_frame = ttk.LabelFrame(self, text="Other Assumptions")
-        other_frame.pack(fill='x', padx=10, pady=5)
-        
-        # Lapse rate
-        self.create_styled_label(other_frame, "Lapse Rate:", 0, 0)
-        lapse_entry = self.create_styled_entry(
-            other_frame,
-            self.variables['lapse_rate'],
             0, 1
         )
-        ToolTip(lapse_entry, "Annual lapse rate (e.g., 0.05 for 5%)")
+        ToolTip(mort_entry, "Multiplier for base mortality rates")
         
-        # Inflation rate
-        self.create_styled_label(other_frame, "Inflation Rate:", 1, 0)
-        infl_entry = self.create_styled_entry(
-            other_frame,
-            self.variables['inflation_rate'],
+        # Lapse
+        self.create_styled_label(frame, "Base Lapse Rate:", 1, 0)
+        lapse_entry = self.create_styled_entry(
+            frame,
+            self.variables['lapse_rate'],
             1, 1
         )
-        ToolTip(infl_entry, "Annual inflation rate (e.g., 0.02 for 2%)")
+        ToolTip(lapse_entry, "Base annual lapse rate")
+        
+        # Inflation
+        self.create_styled_label(frame, "Inflation Rate:", 2, 0)
+        infl_entry = self.create_styled_entry(
+            frame,
+            self.variables['inflation_rate'],
+            2, 1
+        )
+        ToolTip(infl_entry, "Annual inflation rate")

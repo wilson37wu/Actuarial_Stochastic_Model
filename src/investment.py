@@ -77,6 +77,111 @@ class InvestmentPortfolio:
             
             self.transactions[date] = transactions
 
+    def update_allocation(self, new_allocation: Dict[AssetClass, float]) -> None:
+        """Update portfolio allocation.
+        
+        Args:
+            new_allocation: New target allocation for each asset class
+        """
+        self.validate_allocation(new_allocation)
+        self.allocation = new_allocation
+        
+        # Record the rebalancing transaction
+        if hasattr(self, 'transactions'):
+            current_date = date.today()
+            self.transactions[current_date] = [
+                (asset, alloc, 'rebalance')
+                for asset, alloc in new_allocation.items()
+            ]
+
+    def generate_scenarios(self, n_scenarios: int, n_periods: int, seed: Optional[int] = None) -> pd.DataFrame:
+        """Generate return scenarios for the portfolio.
+        
+        Args:
+            n_scenarios: Number of scenarios to generate
+            n_periods: Number of periods to project
+            seed: Random seed for reproducibility
+            
+        Returns:
+            DataFrame with scenarios as columns and periods as rows
+        """
+        if seed is not None:
+            np.random.seed(seed)
+            
+        # Create correlation matrix
+        assets = list(self.allocation.keys())
+        n_assets = len(assets)
+        correlation = np.eye(n_assets)  # Default to identity matrix
+        
+        # Create arrays for means and volatilities
+        means = np.array([self.asset_params[asset].expected_return / 12 for asset in assets])
+        vols = np.array([self.asset_params[asset].volatility / np.sqrt(12) for asset in assets])
+        
+        # Create covariance matrix
+        cov_matrix = np.outer(vols, vols) * correlation
+        
+        # Generate correlated normal random variables
+        Z = np.random.multivariate_normal(
+            mean=np.zeros(n_assets),
+            cov=cov_matrix,
+            size=(n_periods, n_scenarios)
+        )
+        
+        # Convert to returns using geometric Brownian motion
+        returns = np.exp(
+            (means - 0.5 * vols**2).reshape(1, -1, 1) + 
+            Z.reshape(n_periods, n_assets, n_scenarios)
+        ) - 1
+        
+        # Calculate portfolio returns
+        weights = np.array([self.allocation[asset] for asset in assets])
+        portfolio_returns = np.sum(
+            returns * weights.reshape(1, -1, 1),
+            axis=1
+        )
+        
+        # Create DataFrame
+        scenarios_df = pd.DataFrame(
+            portfolio_returns,
+            columns=[f'Scenario_{i+1}' for i in range(n_scenarios)]
+        )
+        scenarios_df.index = range(1, n_periods + 1)
+        
+        return scenarios_df
+
+    def get_portfolio_metrics(self) -> Dict[str, float]:
+        """Calculate portfolio metrics.
+        
+        Returns:
+            Dictionary with portfolio metrics
+        """
+        # Calculate expected return (annualized)
+        portfolio_return = sum(
+            self.allocation[asset] * self.asset_params[asset].expected_return
+            for asset in self.allocation
+        )
+        
+        # Calculate portfolio volatility (annualized)
+        assets = list(self.allocation.keys())
+        n_assets = len(assets)
+        correlation = np.eye(n_assets)  # Default to identity matrix
+        
+        weights = np.array([self.allocation[asset] for asset in assets])
+        vols = np.array([self.asset_params[asset].volatility for asset in assets])
+        cov_matrix = np.outer(vols, vols) * correlation
+        
+        portfolio_vol = np.sqrt(weights.T @ cov_matrix @ weights)
+        
+        # Calculate Sharpe ratio (assuming risk-free rate of 2%)
+        risk_free_rate = 0.02
+        sharpe_ratio = (portfolio_return - risk_free_rate) / portfolio_vol
+        
+        return {
+            'expected_return': portfolio_return,
+            'volatility': portfolio_vol,
+            'sharpe_ratio': sharpe_ratio
+        }
+
 class TargetDateStrategy:
     """Target date investment strategy."""
     

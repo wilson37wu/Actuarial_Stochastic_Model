@@ -50,7 +50,7 @@ def create_sample_portfolio():
 def generate_scenarios(num_scenarios: int, projection_years: int):
     """Generate economic scenarios for testing."""
     today = date.today()
-    dates = pd.date_range(start=today, periods=projection_years*12, freq='ME')
+    dates = pd.date_range(start=today, periods=projection_years*12, freq='M')
     
     scenarios = []
     for i in range(num_scenarios):
@@ -107,8 +107,8 @@ def example_1_basic_projection():
     print(f"\nProjected cash flows for {bond.id}:")
     print("\nFirst few cash flows:")
     print(cashflows.head().to_string())
-    print(f"\nTotal projected coupon payments: ${cashflows['coupon'].sum():,.2f}")
-    print(f"Total projected principal payments: ${cashflows['principal'].sum():,.2f}")
+    print(f"\nTotal projected coupon payments: ${cashflows['coupon_payment'].sum():,.2f}")
+    print(f"Total projected principal payments: ${cashflows['principal_payment'].sum():,.2f}")
 
 def example_2_portfolio_metrics():
     """Example 2: Calculate and display portfolio metrics."""
@@ -160,14 +160,14 @@ def example_3_scenario_analysis():
             
         asset_model.set_economic_scenarios(scenario)
         cf = asset_model.project_fixed_income(bonds, 0)
-        total_cf = cf.groupby('date')[['coupon', 'principal']].sum().sum(axis=1)
+        total_cf = cf.groupby('date')[['coupon_payment', 'principal_payment']].sum().sum(axis=1)
         total_cashflows.append(total_cf)
     
     # Convert to DataFrame for analysis
     cf_df = pd.DataFrame(total_cashflows)
     
     # Calculate statistics
-    percentiles = [5, 25, 50, 75, 95]
+    percentiles = [0.05, 0.25, 0.50, 0.75, 0.95]  # Convert percentages to decimals
     stats = cf_df.describe(percentiles=percentiles)
     
     print("\nCash Flow Statistics (across all scenarios):")

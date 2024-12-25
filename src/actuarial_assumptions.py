@@ -80,6 +80,25 @@ class MortalityTable:
         # Recreate interpolator with new rates
         self._create_interpolator()
     
+    def set_multiplier(self, multiplier: float) -> None:
+        """Set a multiplier for all mortality rates.
+        
+        Args:
+            multiplier: Factor to multiply all rates by
+        """
+        # Store original rates if not already stored
+        if not hasattr(self, '_original_rates'):
+            self._original_rates = self.base_rates.copy()
+        
+        # Apply multiplier to original rates
+        self.base_rates = {
+            age: rate * multiplier
+            for age, rate in self._original_rates.items()
+        }
+        
+        # Recreate interpolator with new rates
+        self._create_interpolator()
+    
     def get_rate(self,
                  age: int,
                  sex: Sex,
@@ -148,6 +167,25 @@ class LapseAssumption:
         
         return min(1.0, base_rate)  # Cap at 100%
 
+    def set_base_rate(self, rate: float) -> None:
+        """Set a uniform base lapse rate for all durations.
+        
+        Args:
+            rate: New base lapse rate to use
+        """
+        # Store original rates if not already stored
+        if not hasattr(self, '_original_rates'):
+            self._original_rates = self.base_rates.copy()
+            
+        # Set uniform rate for all durations
+        self.base_rates = {
+            duration: rate
+            for duration in self._original_rates.keys()
+        }
+        
+        # Recreate interpolator with new rates
+        self._create_interpolator()
+
 class InflationAssumption:
     """Inflation rate assumptions."""
     
@@ -183,6 +221,35 @@ class InflationAssumption:
             is_medical=is_medical
         )
         return (1 + rate) ** projection_year
+
+    def set_rate(self, rate: float) -> None:
+        """Set base inflation rate and adjust related rates.
+        
+        Args:
+            rate: New base inflation rate
+        """
+        # Store original rates if not already stored
+        if not hasattr(self, '_original_rates'):
+            self._original_rates = {
+                'base': self.base_rate,
+                'wage': self.wage_inflation,
+                'medical': self.medical_inflation
+            }
+            
+        # Update base rate
+        self.base_rate = rate
+        
+        # Maintain relative relationships for wage and medical inflation
+        if self._original_rates['base'] > 0:
+            wage_ratio = self._original_rates['wage'] / self._original_rates['base']
+            medical_ratio = self._original_rates['medical'] / self._original_rates['base']
+        else:
+            wage_ratio = 1.5  # Default wage inflation is 1.5x base
+            medical_ratio = 2.0  # Default medical inflation is 2x base
+            
+        # Update related rates
+        self.wage_inflation = rate * wage_ratio
+        self.medical_inflation = rate * medical_ratio
 
 @dataclass
 class MortalityImprovement:

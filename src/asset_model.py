@@ -31,7 +31,7 @@ class AssetModel:
         projection_dates = pd.date_range(
             start=start_date,
             end=end_date,
-            freq='ME'
+            freq='M'
         ).date
         
         all_cashflows = []
@@ -95,7 +95,7 @@ class AssetModel:
         projection_dates = pd.date_range(
             start=start_date,
             end=end_date,
-            freq='ME'
+            freq='M'
         ).date
         
         # Create scenario rates for the projection period
@@ -167,7 +167,7 @@ class AssetModel:
             raise ValueError("Economic scenarios must be set before projection")
             
         # Create projection dates
-        freq = 'ME' if frequency == 'monthly' else 'YE'
+        freq = 'M' if frequency == 'monthly' else 'A'
         periods = projection_years * (12 if frequency == 'monthly' else 1)
         
         projection_dates = pd.date_range(

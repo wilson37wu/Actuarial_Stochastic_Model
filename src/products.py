@@ -15,9 +15,12 @@ from .enums import (
     ProductType, DividendOption, InvestmentStrategy, PremiumMode, PremiumStatus, NonForfeitureOption
 )
 from .actuarial_assumptions import (
-    MortalityTable, LapseAssumption, InflationAssumption
+    MortalityTable, LapseAssumption, InflationAssumption,
+    create_sample_mortality_table, create_sample_lapse_assumption,
+    create_sample_inflation_assumption
 )
 from .investment import AssetClass, InvestmentPortfolio, TargetDateStrategy
+from .gcv_calculator import GCVParameters, GradingPattern, ProductVariant
 
 class DividendOption(Enum):
     """Dividend payment options for participating policies."""
@@ -101,21 +104,43 @@ class PolicyValues:
 @dataclass
 class BaseInsuranceContract:
     """Base class for insurance contracts."""
+    
+    # Required fields (no defaults)
     policy_number: str
     issue_date: date
-    term_length: int
-    premium: float
+    product_type: ProductType
+    face_amount: float
     issue_age: int
     sex: Sex
-    smoking_status: SmokingStatus
-    occupation_class: OccupationClass
-    underwriting_class: UnderwritingClass
+    
+    # Optional fields (with defaults)
     premium_mode: PremiumMode = PremiumMode.ANNUAL
-    nonforfeiture_option: NonForfeitureOption = NonForfeitureOption.AUTOMATIC_PREMIUM_LOAN
-    premium_history: List[PremiumHistory] = field(default_factory=list)
+    modal_premium: float = 0.0
+    underwriting_class: UnderwritingClass = UnderwritingClass.STANDARD
+    smoking_status: SmokingStatus = SmokingStatus.NON_SMOKER
+    occupation_class: OccupationClass = OccupationClass.STANDARD
+    
+    # Product features
+    dividend_option: DividendOption = DividendOption.CASH
+    nonforfeiture_option: NonForfeitureOption = NonForfeitureOption.CASH_SURRENDER
+    investment_strategy: Optional[InvestmentStrategy] = None
+    
+    # Product variant and GCV parameters
+    product_variant: ProductVariant = ProductVariant.STANDARD
+    gcv_parameters: Optional[GCVParameters] = None
+    
+    # Premium flexibility
+    min_premium: Optional[float] = None
+    max_premium: Optional[float] = None
     premium_holiday_available: bool = True
     max_premium_holiday: int = 12  # months
     current_premium_holiday: int = 0
+    
+    # Actuarial assumptions
+    mortality_table: MortalityTable = field(default_factory=create_sample_mortality_table)
+    lapse_assumption: LapseAssumption = field(default_factory=create_sample_lapse_assumption)
+    inflation_assumption: InflationAssumption = field(default_factory=create_sample_inflation_assumption)
+    premium_history: List[PremiumHistory] = field(default_factory=list)
     
     def get_attained_age(self, valuation_date: date) -> int:
         """Calculate attained age at valuation date."""
@@ -183,6 +208,57 @@ class BaseInsuranceContract:
             self.current_premium_holiday = 0
             return True
         return False
+    
+    def get_annual_premium(self) -> float:
+        """Get annualized premium amount."""
+        if self.premium_mode == PremiumMode.ANNUAL:
+            return self.premium
+        elif self.premium_mode == PremiumMode.SEMI_ANNUAL:
+            return self.premium * 2
+        elif self.premium_mode == PremiumMode.QUARTERLY:
+            return self.premium * 4
+        elif self.premium_mode == PremiumMode.MONTHLY:
+            return self.premium * 12
+        else:
+            return self.premium  # For flexible premium, return modal amount
+            
+    def get_premium_pv(self, valuation_rate: float = 0.035) -> float:
+        """Calculate present value of future premiums at time 0.
+        
+        Args:
+            valuation_rate: Annual discount rate for present value calculation
+            
+        Returns:
+            Present value of premiums
+        """
+        annual_premium = self.get_annual_premium()
+        
+        # Get mortality rates for each future year
+        max_duration = 100 - self.issue_age  # Maximum duration to age 100
+        mortality_rates = []
+        for t in range(max_duration):
+            attained_age = self.issue_age + t
+            qx = self.mortality_table.get_rate(
+                age=attained_age,
+                sex=self.sex,
+                smoking_status=self.smoking_status
+            )
+            mortality_rates.append(qx)
+        
+        # Calculate probability of survival to each year
+        survival_probs = []
+        cum_prob = 1.0
+        for qx in mortality_rates:
+            survival_probs.append(cum_prob)
+            cum_prob *= (1 - qx)
+        
+        # Calculate present value
+        pv = 0.0
+        v = 1 / (1 + valuation_rate)
+        for t in range(max_duration):
+            pv += annual_premium * survival_probs[t] * (v ** t)
+        
+        return pv
 
 class TermInsurance(BaseInsuranceContract):
     """Term life insurance contract."""

@@ -1,0 +1,13 @@
+{
+    "asset_strategy": "TargetDate",
+    "equity_weight": "0.6",
+    "bond_weight": "0.4",
+    "expected_return": "0.06",
+    "product_type": "Term",
+    "face_amount": "100000",
+    "premium": "1000",
+    "premium_mode": "Annual",
+    "mortality_multiplier": "1.0",
+    "lapse_rate": "0.05",
+    "inflation_rate": "0.02"
+}
