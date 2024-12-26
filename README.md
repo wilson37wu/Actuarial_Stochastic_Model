@@ -160,6 +160,53 @@ Implementation of a stochastic model for insurance contract liability evaluation
    - Lapse behavior
    - Inflation impacts
 
+## Dashboard Overview
+The dashboard provides an interactive interface for analyzing actuarial models, focusing on dividend tracking, investment returns, and liability assessments. It allows users to input various parameters and visualize the results dynamically.
+
+## Installation
+Ensure you have Python 3.11 installed and set up a virtual environment. Install the required packages using:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Running the Dashboard
+To run the Streamlit dashboard, execute the following command in your terminal:
+
+```bash
+streamlit run src/dashboard/dashboard.py
+```
+
+## Dashboard Features
+1. **Dividend Analysis**: Analyze dividend payments based on user-defined parameters. Users can set the number of policies, periods, and minimum return to simulate different scenarios.
+2. **Investment Analysis**: Evaluate projected returns for fixed income and equity portfolios. Users can adjust parameters such as duration, credit quality, expected return, and volatility.
+3. **Liability Analysis**: Assess liability metrics and visualize recovery metrics over time.
+
+## Input Parameters
+### Dividend Analysis
+- **Number of Policies**: Total number of policies to simulate (1-10).
+- **Number of Periods**: Time periods for the analysis (5-100).
+- **Minimum Return**: The minimum return threshold for the simulation (-10% to 0%).
+
+### Investment Analysis
+- **Duration**: Duration of the fixed income portfolio (1-10 years).
+- **Credit Quality**: Credit quality of the fixed income assets (AAA, AA, A, BBB).
+- **Yield Rate**: Expected yield rate for fixed income assets (0.01 to 0.10).
+- **Expected Return**: Expected return for equity investments (0.05 to 0.15).
+- **Volatility**: Expected volatility for equity investments (0.10 to 0.30).
+- **Dividend Yield**: Expected dividend yield for equity investments (0.01 to 0.05).
+
+## Expected Outputs
+- **Dividend Analysis Results**: Metrics including average return, total dividends, policies with dividends, and average dividend per policy.
+- **Investment Analysis Charts**: Projected returns for fixed income and equity portfolios displayed as line charts.
+- **Liability Analysis Metrics**: Recovery metrics visualized over time.
+
+## Contributing
+Contributions are welcome! Please submit a pull request or open an issue for discussion.
+
+## License
+This project is licensed under the MIT License.
+
 ## Data Specifications
 
 ### Economic Scenarios
