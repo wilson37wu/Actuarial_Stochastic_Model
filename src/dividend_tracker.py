@@ -120,6 +120,10 @@ class DividendTracker:
                 shareholder_cost_rate=self.shareholder_cost_rate
             )
     
+    def reset(self) -> None:
+        """Reset all dividend tracking accounts."""
+        self.accounts.clear()
+
     def run_stress_test(self,
                        policy_number: str,
                        face_amount: float,
@@ -360,7 +364,6 @@ class DividendTracker:
         
         # Initialize returns array
         returns = [0.0] * max_periods
-        account_count = len(self.accounts)
         
         # Sum returns for each period
         for account in self.accounts.values():
@@ -368,7 +371,8 @@ class DividendTracker:
                 returns[i] += ret
         
         # Average returns across accounts
-        returns = [ret / account_count for ret in returns]
+        n_accounts = len(self.accounts)
+        returns = [ret / n_accounts for ret in returns]
         
         return returns
 
@@ -397,3 +401,11 @@ class DividendTracker:
                 dividends[i] += div
         
         return dividends
+
+    def get_tracking_balances(self) -> List[float]:
+        """Get tracking balances for all accounts.
+        
+        Returns:
+            List of tracking balances for each account.
+        """
+        return [account.tracking_balance for account in self.accounts.values()]

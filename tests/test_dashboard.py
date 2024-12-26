@@ -1,4 +1,34 @@
-"""Test suite for dashboard components."""
+"""Test suite for dashboard components.
+
+To run these tests:
+
+1. From command line:
+   - Navigate to project root: cd c:/Users/wilso/Actuarial_Stochastic_Model
+   - Run all tests: python -m pytest tests/
+   - Run specific test file: python -m pytest tests/test_dashboard.py
+   - Run specific test: python -m pytest tests/test_dashboard.py -k test_grading_patterns
+
+2. From Python IDE:
+   - Right click on test file and select "Run pytest in test_dashboard.py"
+   - Or run individual test by clicking the green arrow next to the test method
+
+3. With coverage report:
+   - Install coverage: pip install coverage
+   - Run with coverage: coverage run -m pytest tests/
+   - View report: coverage report
+   - HTML report: coverage html
+
+Note: Make sure you're in your virtual environment before running tests:
+- Windows: venv\Scripts\activate
+- Unix/MacOS: source venv/bin/activate
+
+To run the Streamlit app:
+- Run the app: C:\Users\wilso\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\python.exe -m streamlit run src/dashboard/dashboard.py
+
+"""
+
+
+
 import unittest
 import numpy as np
 from src.dashboard.dashboard import ModelDashboard

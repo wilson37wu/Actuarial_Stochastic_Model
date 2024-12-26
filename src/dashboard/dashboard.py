@@ -146,11 +146,21 @@ class ModelDashboard:
                 )
 
     def _apply_grading_pattern(self, year: int, pattern: GradingPattern) -> float:
-        """Apply the specified grading pattern."""
-        self.calculator.parameters.grading_pattern = pattern
-        
+        """Apply the specified grading pattern to calculate value for given year."""
+        # Set up default stepwise points if using stepwise pattern
+        if pattern == GradingPattern.STEPWISE and not self.calculator.parameters.stepwise_points:
+            self.calculator.parameters.stepwise_points = {
+                0: 1.0,
+                5: 0.8,
+                10: 0.6,
+                15: 0.4,
+                20: 0.2,
+                25: 0.0
+            }
+            
         if pattern == GradingPattern.LINEAR:
-            return self.calculator._apply_linear_grading(year)
+            # Convert to float to ensure float return type
+            return float(max(0, 1.0 - (year / self.calculator.parameters.grading_years)))
         elif pattern == GradingPattern.S_CURVE:
             return self.calculator._apply_s_curve_grading(year)
         elif pattern == GradingPattern.STEPWISE:
@@ -163,127 +173,381 @@ class ModelDashboard:
             return self.calculator._apply_dynamic_grading(year)
         elif pattern == GradingPattern.HYBRID:
             return self.calculator._apply_hybrid_grading(year)
-        else:  # CUSTOM
-            return self.calculator._apply_linear_grading(year)  # Fallback to linear
+        else:
+            return float(max(0, 1.0 - (year / self.calculator.parameters.grading_years)))
 
     def run(self):
         """Run the dashboard."""
-        # Configure page layout
-        st.set_page_config(
-            page_title="Actuarial Model Dashboard",
-            page_icon="📊",
-            layout="wide",
-            initial_sidebar_state="expanded"
+        st.title("Actuarial Model Analysis Dashboard")
+        
+        # Add sidebar for navigation
+        st.sidebar.title("Navigation")
+        page = st.sidebar.selectbox(
+            "Choose a section",
+            ["GCV Analysis", "Dividend Analysis", "Investment Analysis", 
+             "Liability Analysis", "Portfolio Analysis", "Scenario Analysis"]
         )
         
-        # Apply dashboard theme
-        styling.apply_dashboard_theme()
-        
-        # Sidebar
-        with st.sidebar:
-            st.image("https://www.codeium.com/images/logo-dark.png", width=200)
-            st.title("Model Parameters")
-            
-            # Analysis type selector
-            analysis_type = st.selectbox(
-                "Select Analysis Type",
-                ["GCV Analysis", "Dividend Analysis", "Investment Analysis", 
-                 "Liability Analysis", "Portfolio Analysis", "Scenario Analysis"]
-            )
-        
-        # Main content area
-        st.title(f"{analysis_type}")
-        
-        if analysis_type == "GCV Analysis":
+        # Display the selected section
+        if page == "GCV Analysis":
+            st.header("Guaranteed Cash Value Analysis")
             self._run_gcv_analysis()
-        elif analysis_type == "Dividend Analysis":
+        elif page == "Dividend Analysis":
+            st.header("Dividend Analysis")
             self._run_dividend_analysis()
-        elif analysis_type == "Investment Analysis":
+        elif page == "Investment Analysis":
+            st.header("Investment Analysis")
             self._run_investment_analysis()
-        elif analysis_type == "Liability Analysis":
+        elif page == "Liability Analysis":
+            st.header("Liability Analysis")
             self._run_liability_analysis()
-        elif analysis_type == "Portfolio Analysis":
+        elif page == "Portfolio Analysis":
+            st.header("Portfolio Analysis")
             self._run_portfolio_analysis()
         else:  # Scenario Analysis
+            st.header("Scenario Analysis")
             self._run_scenario_analysis()
-    
+
     def _run_gcv_analysis(self):
         """Run GCV analysis section."""
+        # Parameters
         col1, col2 = st.columns(2)
         
         with col1:
-            show_3d = st.checkbox("Show 3D Visualization")
+            st.subheader("GCV Parameters")
+            base_percentage = st.slider(
+                "Base Percentage",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.7,
+                step=0.1,
+                key="base_percentage"
+            )
+            initial_gcv = st.slider(
+                "Initial GCV Percentage",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.5,
+                step=0.1,
+                key="initial_gcv"
+            )
+            grading_years = st.slider(
+                "Grading Years",
+                min_value=5,
+                max_value=30,
+                value=10,
+                step=1,
+                key="grading_years"
+            )
+            min_gcv = st.slider(
+                "Minimum GCV Percentage",
+                min_value=0.0,
+                max_value=0.5,
+                value=0.05,
+                step=0.05,
+                key="min_gcv"
+            )
             
-            with st.expander("Pattern Mixing", expanded=False):
-                enable_mixing = st.checkbox("Enable Pattern Mixing")
-                pattern_weights = {}
-                
-                if enable_mixing:
-                    total_weight = 0
-                    for pattern in GradingPattern.__members__.keys():
-                        weight = st.slider(f"{pattern} Weight", 0.0, 1.0, 0.0)
-                        pattern_weights[pattern] = weight
-                        total_weight += weight
-                    
-                    if total_weight > 0:
-                        pattern_weights = {k: v/total_weight for k, v in pattern_weights.items()}
+            pattern = st.selectbox(
+                "Grading Pattern",
+                options=[p.name for p in GradingPattern],
+                index=0,
+                key="pattern"
+            )
         
         with col2:
-            st.metric("Analysis Mode", "Pattern Analysis" if not pattern_weights else "Pattern Mixing")
+            st.subheader("Product Parameters")
+            premium = st.number_input(
+                "Annual Premium",
+                min_value=1000,
+                max_value=1000000,
+                value=10000,
+                step=1000,
+                key="premium"
+            )
+            face_amount = st.number_input(
+                "Face Amount",
+                min_value=10000,
+                max_value=10000000,
+                value=100000,
+                step=10000,
+                key="face_amount"
+            )
+            valuation_rate = st.slider(
+                "Valuation Rate",
+                min_value=0.01,
+                max_value=0.10,
+                value=0.035,
+                step=0.005,
+                format="%.3f",
+                key="valuation_rate"
+            )
         
-        # Main visualization area
-        st.divider()
-        
-        if show_3d:
-            fig = self._plot_3d_gcv_surface()
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            if pattern_weights:
-                fig = self._plot_mixed_pattern(pattern_weights)
-            else:
-                fig = self._plot_gcv_patterns()
-            st.plotly_chart(fig, use_container_width=True)
-    
+        # Add Calculate button
+        if st.button("Calculate GCV", key="calculate_gcv"):
+            # Update calculator parameters
+            self.calculator.parameters = GCVParameters(
+                base_percentage=base_percentage,
+                initial_gcv_percentage=initial_gcv,
+                grading_years=grading_years,
+                minimum_gcv_percentage=min_gcv,
+                grading_pattern=GradingPattern[pattern]
+            )
+            self.calculator.valuation_rate = valuation_rate
+            
+            # Calculate summary statistics
+            years = list(range(grading_years + 1))
+            gcv_values = [self._apply_grading_pattern(year, GradingPattern[pattern]) for year in years]
+            
+            # Display summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Initial GCV", f"{gcv_values[0]:.2%}")
+            with col2:
+                st.metric("Mid-Point GCV", f"{gcv_values[grading_years//2]:.2%}")
+            with col3:
+                st.metric("Final GCV", f"{gcv_values[-1]:.2%}")
+            with col4:
+                st.metric("Average GCV", f"{sum(gcv_values)/len(gcv_values):.2%}")
+            
+            # Display analysis
+            st.subheader("Analysis Results")
+            tab1, tab2, tab3 = st.tabs(["GCV Patterns", "3D Surface", "Pattern Derivatives"])
+            
+            with tab1:
+                st.plotly_chart(self._plot_gcv_patterns(max_years=30), use_container_width=True)
+                
+            with tab2:
+                st.plotly_chart(self._plot_3d_gcv_surface(), use_container_width=True)
+                
+            with tab3:
+                st.plotly_chart(self._plot_pattern_derivatives(max_years=30), use_container_width=True)
+
     def _run_dividend_analysis(self):
         """Run dividend analysis section."""
-        col1, col2, col3, col4 = st.columns(4)
+        st.subheader("Dividend Analysis Parameters")
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            n_policies = st.number_input("Number of Policies", 1, 10, 3)
+            n_policies = st.number_input("Number of Policies", 1, 10, 3, key="n_policies")
         with col2:
-            n_periods = st.number_input("Number of Periods", 5, 100, 20)
+            n_periods = st.number_input("Number of Periods", 5, 100, 20, key="n_periods")
         with col3:
-            st.metric("Average Return", f"{self.tracker.get_average_return():.2%}")
-        with col4:
-            st.metric("Total Dividends", f"${self.tracker.get_total_dividends():,.2f}")
+            min_return = st.slider("Minimum Return", -0.10, 0.0, -0.05, step=0.01, key="min_return")
         
-        # Visualization area
-        st.divider()
+        if st.button("Calculate Dividends", key="calculate_dividends"):
+            # Reset tracker
+            self.tracker.reset()
+            
+            # Generate policies and calculate dividends
+            for i in range(n_policies):
+                policy_number = f"POL_{i+1}"
+                self.tracker.initialize_account(policy_number)
+                
+                # Generate returns and calculate dividends for each period
+                returns = np.random.normal(0.06, 0.12, n_periods)
+                returns = np.maximum(returns, min_return)  # Apply minimum return
+                
+                for t, ret in enumerate(returns):
+                    # Calculate dividend for this period
+                    self.tracker.calculate_dividend(
+                        policy_number=policy_number,
+                        asset_return=ret,
+                        face_amount=100000,  # Example face amount
+                        valuation_date=date(2024, 1, 1)  # Example date
+                    )
+            
+            # Display metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Average Return", f"{self.tracker.get_average_return():.2%}")
+            with col2:
+                st.metric("Total Dividends", f"${self.tracker.get_total_dividends():,.2f}")
+            with col3:
+                active_policies = len([acc for acc in self.tracker.accounts.values() 
+                                    if len(acc.dividend_history) > 0])
+                st.metric("Policies with Dividends", f"{active_policies}/{n_policies}")
+            with col4:
+                avg_dividend = (self.tracker.get_total_dividends() / n_policies 
+                              if n_policies > 0 else 0)
+                st.metric("Average Dividend per Policy", f"${avg_dividend:,.2f}")
+            
+            # Visualization area
+            st.subheader("Analysis Results")
+            tab1, tab2, tab3 = st.tabs(["Returns vs Dividends", "Tracking Balance", "Recovery Metrics"])
+            
+            with tab1:
+                fig = self._plot_returns_vs_dividends()
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with tab2:
+                fig = self._plot_tracking_balance()
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with tab3:
+                fig = self._plot_recovery_metrics()
+                st.plotly_chart(fig, use_container_width=True)
+
+    def _plot_returns_vs_dividends(self):
+        """Plot returns vs dividends relationship with high contrast colors."""
+        returns = self.tracker.get_returns()
+        dividends = self.tracker.get_dividends()
+        periods = list(range(1, len(returns) + 1))
         
-        tab1, tab2, tab3 = st.tabs(["Returns vs Dividends", "Tracking Balance", "Recovery Metrics"])
+        fig = go.Figure()
         
-        with tab1:
-            fig = self._plot_returns_vs_dividends()
-            st.plotly_chart(fig, use_container_width=True)
+        # Add returns line
+        fig.add_trace(go.Scatter(
+            x=periods,
+            y=returns,
+            name='Returns',
+            line=dict(color='#FF0000', width=2),  # Bright red
+            mode='lines+markers'
+        ))
         
-        with tab2:
-            fig = self._plot_tracking_balance()
-            st.plotly_chart(fig, use_container_width=True)
+        # Add dividends line
+        fig.add_trace(go.Scatter(
+            x=periods,
+            y=dividends,
+            name='Dividends',
+            line=dict(color='#0000FF', width=2),  # Bright blue
+            mode='lines+markers'
+        ))
         
-        with tab3:
-            fig = self._plot_recovery_metrics()
-            st.plotly_chart(fig, use_container_width=True)
-    
+        fig.update_layout(
+            title='Investment Returns vs Dividends',
+            xaxis_title='Period',
+            yaxis_title='Rate',
+            showlegend=True,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font=dict(size=12),
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+                bgcolor='rgba(255, 255, 255, 0.8)'
+            )
+        )
+        
+        # Add grid lines
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        
+        return fig
+
+    def _plot_tracking_balance(self):
+        """Plot tracking account balance with high contrast colors."""
+        balances = self.tracker.get_tracking_balances()
+        periods = list(range(1, len(balances) + 1))
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=periods,
+            y=balances,
+            name='Balance',
+            line=dict(color='#00AA00', width=2),  # Bright green
+            mode='lines+markers',
+            fill='tozeroy',
+            fillcolor='rgba(0, 170, 0, 0.1)'  # Light green fill
+        ))
+        
+        fig.update_layout(
+            title='Tracking Account Balance',
+            xaxis_title='Period',
+            yaxis_title='Balance ($)',
+            showlegend=True,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font=dict(size=12)
+        )
+        
+        # Add grid lines
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        
+        return fig
+
+    def _plot_recovery_metrics(self):
+        """Plot recovery metrics with high contrast colors."""
+        metrics = self.tracker.analyze_recovery_metrics(policy_number="POL_1")  # Example policy number
+        
+        if not metrics:
+            return go.Figure()
+        
+        fig = go.Figure()
+        
+        # Add recovery efficiency line
+        recovery_efficiency = metrics.get('recovery_efficiency', 0)
+        fig.add_trace(go.Scatter(
+            x=[0],
+            y=[recovery_efficiency],
+            name='Recovery Efficiency',
+            line=dict(color='#AA00AA', width=2),  # Bright purple
+            mode='lines+markers'
+        ))
+        
+        fig.update_layout(
+            title='Recovery Metrics Over Time',
+            xaxis_title='Period',
+            yaxis_title='Metric Value',
+            showlegend=True,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font=dict(size=12)
+        )
+        
+        # Add grid lines
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        
+        return fig
+
     def _run_investment_analysis(self):
         """Run investment analysis section."""
+        st.subheader("Investment Analysis Parameters")
         col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("Fixed Income Portfolio")
-            duration = st.slider("Duration (Years)", 1.0, 10.0, 5.0)
-            credit_quality = st.selectbox("Credit Quality", ["AAA", "AA", "A", "BBB"])
-            yield_rate = st.slider("Yield Rate", 0.01, 0.10, 0.04)
+            duration = st.slider("Duration (Years)", 1.0, 10.0, 5.0, key="fi_duration")
+            credit_quality = st.selectbox(
+                "Credit Quality", 
+                ["AAA", "AA", "A", "BBB"],
+                key="fi_credit_quality"
+            )
+            yield_rate = st.slider(
+                "Yield Rate", 
+                0.01, 0.10, 0.04, 
+                step=0.01,
+                key="fi_yield_rate"
+            )
             
+        with col2:
+            st.subheader("Equity Portfolio")
+            expected_return = st.slider(
+                "Expected Return", 
+                0.05, 0.15, 0.08, 
+                step=0.01,
+                key="eq_expected_return"
+            )
+            volatility = st.slider(
+                "Volatility", 
+                0.10, 0.30, 0.15, 
+                step=0.01,
+                key="eq_volatility"
+            )
+            dividend_yield = st.slider(
+                "Dividend Yield", 
+                0.01, 0.05, 0.02, 
+                step=0.01,
+                key="eq_dividend_yield"
+            )
+
+        if st.button("Calculate Returns", key="calculate_returns"):
+            # Update fixed income parameters
             self.fixed_income.update_parameters({
                 'default_recovery_rates': {
                     'AAA': 0.95, 'AA': 0.90, 'A': 0.85,
@@ -291,24 +555,61 @@ class ModelDashboard:
                 }
             })
             
-            fixed_income_returns = self.fixed_income.project_returns(n_periods=12)
-            st.line_chart(fixed_income_returns)
-        
-        with col2:
-            st.subheader("Equity Portfolio")
-            expected_return = st.slider("Expected Return", 0.05, 0.15, 0.08)
-            volatility = st.slider("Volatility", 0.10, 0.30, 0.15)
-            dividend_yield = st.slider("Dividend Yield", 0.01, 0.05, 0.02)
-            
+            # Update equity parameters
             self.equity.update_parameters({
                 'market_volatility': volatility,
                 'expected_return': expected_return,
                 'dividend_yield': dividend_yield
             })
             
-            equity_returns = self.equity.project_returns(n_periods=12)
-            st.line_chart(equity_returns)
-    
+            # Display results
+            st.subheader("Analysis Results")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Fixed Income Returns")
+                fixed_income_returns = self.fixed_income.project_returns(n_periods=12)
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=list(range(1, 13)),
+                    y=fixed_income_returns,
+                    name='Fixed Income',
+                    line=dict(color='#00AA00', width=2),  # Bright green
+                    mode='lines+markers'
+                ))
+                fig.update_layout(
+                    title='Projected Fixed Income Returns',
+                    xaxis_title='Month',
+                    yaxis_title='Return',
+                    plot_bgcolor='white',
+                    paper_bgcolor='white'
+                )
+                fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.subheader("Equity Returns")
+                equity_returns = self.equity.project_returns(n_periods=12)
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=list(range(1, 13)),
+                    y=equity_returns,
+                    name='Equity',
+                    line=dict(color='#FF0000', width=2),  # Bright red
+                    mode='lines+markers'
+                ))
+                fig.update_layout(
+                    title='Projected Equity Returns',
+                    xaxis_title='Month',
+                    yaxis_title='Return',
+                    plot_bgcolor='white',
+                    paper_bgcolor='white'
+                )
+                fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                st.plotly_chart(fig, use_container_width=True)
+
     def _run_liability_analysis(self):
         """Run liability analysis section."""
         st.subheader("Liability Model Parameters")
@@ -434,66 +735,87 @@ class ModelDashboard:
         
         st.plotly_chart(fig)
 
+    def _plot_gcv_patterns(self, max_years: int = 30) -> go.Figure:
+        """Plot GCV patterns comparison."""
+        years = np.arange(max_years + 1)
+        fig = go.Figure()
+        
+        for pattern in GradingPattern:
+            values = [self._apply_grading_pattern(year, pattern) for year in years]
+            fig.add_trace(go.Scatter(
+                x=years,
+                y=values,
+                name=pattern.name,
+                mode='lines',
+            ))
+        
+        fig.update_layout(
+            title="GCV Grading Patterns Comparison",
+            xaxis_title="Policy Year",
+            yaxis_title="GCV Factor",
+            showlegend=True
+        )
+        return fig
+    
     def _plot_3d_gcv_surface(self) -> go.Figure:
         """Create 3D surface plot of GCV values."""
-        # Generate data
-        years = np.linspace(0, 30, 50)
-        rates = np.linspace(0.01, 0.15, 50)
+        years = np.linspace(0, 30, 31)
+        rates = np.linspace(0.01, 0.10, 10)
         X, Y = np.meshgrid(years, rates)
         Z = np.zeros_like(X)
         
         for i in range(len(years)):
             for j in range(len(rates)):
-                Z[j,i] = self.calculator._apply_grading_pattern(years[i], GradingPattern.LINEAR)
+                # Store original valuation rate
+                orig_rate = self.calculator.valuation_rate
+                # Update rate temporarily
+                self.calculator.valuation_rate = rates[j]
+                # Calculate GCV
+                Z[j,i] = self._apply_grading_pattern(int(years[i]), self.calculator.parameters.grading_pattern)
+                # Restore original rate
+                self.calculator.valuation_rate = orig_rate
         
-        return self.visualizer.plot_3d_surface(
-            X, Y, Z,
-            title='GCV Surface by Year and Interest Rate',
-            x_label='Policy Year',
-            y_label='Interest Rate',
-            z_label='GCV Factor'
+        fig = go.Figure(data=[go.Surface(x=X, y=Y, z=Z)])
+        fig.update_layout(
+            title='GCV Surface Analysis',
+            scene=dict(
+                xaxis_title='Policy Year',
+                yaxis_title='Interest Rate',
+                zaxis_title='GCV Factor'
+            ),
+            width=800,
+            height=800
         )
-    
-    def _plot_gcv_patterns(self, max_years: int = 30) -> go.Figure:
-        """Plot GCV patterns comparison."""
-        years = list(range(max_years))
-        patterns = {}
-        
-        for name, pattern in GradingPattern.__members__.items():
-            values = [
-                self._apply_grading_pattern(year, pattern)
-                for year in years
-            ]
-            patterns[name] = values
-        
-        return self.visualizer.plot_gcv_patterns(patterns, years)
+        return fig
     
     def _plot_pattern_derivatives(self, max_years: int = 30) -> go.Figure:
         """Plot pattern derivatives."""
-        years = list(range(max_years))
-        patterns = {}
+        years = np.arange(max_years)
+        fig = go.Figure()
         
-        for name, pattern in GradingPattern.__members__.items():
-            values = [
-                self._apply_grading_pattern(year, pattern)
-                for year in years
-            ]
+        for pattern in GradingPattern:
+            # Calculate derivatives using central differences
+            values = [self._apply_grading_pattern(year, pattern) for year in years]
+            derivatives = np.gradient(values)
             
-            # Calculate derivatives
-            deriv1 = np.gradient(values)
-            deriv2 = np.gradient(deriv1)
-            
-            patterns[name] = {
-                'values': values,
-                'deriv1': deriv1.tolist(),
-                'deriv2': deriv2.tolist()
-            }
+            fig.add_trace(go.Scatter(
+                x=years,
+                y=derivatives,
+                name=pattern.name,
+                mode='lines',
+            ))
         
-        return self.visualizer.plot_pattern_derivatives(patterns, years)
-    
+        fig.update_layout(
+            title="GCV Pattern Derivatives",
+            xaxis_title="Policy Year",
+            yaxis_title="Rate of Change",
+            showlegend=True
+        )
+        return fig
+
     def _plot_mixed_pattern(self, weights: Dict[str, float], max_years: int = 30) -> go.Figure:
         """Plot mixed GCV pattern."""
-        years = list(range(max_years))
+        years = np.arange(max_years)
         mixed_values = np.zeros(max_years)
         
         for pattern_name, weight in weights.items():
@@ -507,38 +829,6 @@ class ModelDashboard:
             {'Mixed Pattern': mixed_values.tolist()},
             years
         )
-    
-    def _plot_returns_vs_dividends(self) -> go.Figure:
-        """Plot returns vs dividends relationship."""
-        returns = self.tracker.get_returns()
-        dividends = self.tracker.get_dividends()
-        periods = list(range(len(returns)))
-        
-        scatter_fig, _ = self.visualizer.plot_dividend_analysis(
-            returns, dividends, periods
-        )
-        return scatter_fig
-    
-    def _plot_tracking_balance(self) -> go.Figure:
-        """Plot tracking account balance."""
-        returns = self.tracker.get_returns()
-        dividends = self.tracker.get_dividends()
-        periods = list(range(len(returns)))
-        
-        _, balance_fig = self.visualizer.plot_dividend_analysis(
-            returns, dividends, periods
-        )
-        return balance_fig
-    
-    def _plot_recovery_metrics(self) -> go.Figure:
-        """Plot recovery metrics."""
-        # Placeholder implementation
-        return go.Figure()
-    
-    def _plot_recovery_projection(self) -> go.Figure:
-        """Plot recovery projection."""
-        # Placeholder implementation
-        return go.Figure()
     
     def _plot_product_variant_gcv(self,
                                 premium: float,
@@ -606,3 +896,14 @@ class ModelDashboard:
         return self.visualizer.plot_sensitivity_analysis(
             parameter, values, results, baseline
         )
+
+if __name__ == "__main__":
+    st.set_page_config(
+        page_title="Actuarial Model Analysis",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    
+    dashboard = ModelDashboard()
+    dashboard.run()
