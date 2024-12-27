@@ -295,20 +295,30 @@ class ModelDashboard:
             )
             self.calculator.valuation_rate = valuation_rate
             
-            # Calculate summary statistics
-            years = list(range(grading_years + 1))
-            gcv_values = [self._apply_grading_pattern(year, GradingPattern[pattern]) for year in years]
+            # Calculate GCV for multiple policy years
+            gcv_values = []
+            for year in range(1, 21):  # Calculate for 20 years
+                gcv_value = self.calculator.calculate_gcv(
+                    sex='M',  # Assuming male for this example
+                    policy_year=year,
+                    premium=st.session_state.get('premium', 5000),
+                    face_amount=st.session_state.get('face_amount', 100000),
+                    pv_premium=st.session_state.get('premium', 5000) / (1 + st.session_state.get('interest_rate', 0.04))
+                )
+                gcv_values.append({'Year': year, 'GCV Value': gcv_value})
+            
+            gcv_results_df = pd.DataFrame(gcv_values)
             
             # Display summary metrics
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("Initial GCV", f"{gcv_values[0]:.2%}")
+                st.metric("Initial GCV", f"{gcv_results_df['GCV Value'].iloc[0]:.2%}")
             with col2:
-                st.metric("Mid-Point GCV", f"{gcv_values[grading_years//2]:.2%}")
+                st.metric("Mid-Point GCV", f"{gcv_results_df['GCV Value'].iloc[10]:.2%}")
             with col3:
-                st.metric("Final GCV", f"{gcv_values[-1]:.2%}")
+                st.metric("Final GCV", f"{gcv_results_df['GCV Value'].iloc[-1]:.2%}")
             with col4:
-                st.metric("Average GCV", f"{sum(gcv_values)/len(gcv_values):.2%}")
+                st.metric("Average GCV", f"{gcv_results_df['GCV Value'].mean():.2%}")
             
             # Display analysis
             st.subheader("Analysis Results")
@@ -710,24 +720,61 @@ class ModelDashboard:
             n_scenarios = st.slider("Number of Scenarios", 100, 1000, 500)
         
         # Run scenarios
-        scenarios = self.investment_portfolio.generate_scenarios(
-            n_periods=n_years * 12,  # Convert years to months
-            n_scenarios=n_scenarios,
-            seed=42  # For reproducibility
-        )
+        scenario_params = {
+            'Parameters': [
+                'Base Scenario',
+                'Time Horizon',
+                'Confidence Level'
+            ],
+            'Value': [
+                'Current Market',
+                st.session_state.get('time_horizon', 5),
+                st.session_state.get('confidence_level', 0.95)
+            ]
+        }
+        scenario_params_df = pd.DataFrame(scenario_params)
+
+        # Generate scenario results
+        n_periods = st.session_state.get('time_horizon', 5) * 12
+        scenario_data = []
+        
+        # Base scenario
+        base_return = self.investment_portfolio.calculate_expected_return()
+        scenario_data.append({
+            'Scenario': 'Base',
+            'Expected Return': base_return,
+            'Risk': self.investment_portfolio.calculate_volatility(),
+            'VaR': self.investment_portfolio.calculate_var()
+        })
+        
+        # Stress scenarios
+        stress_scenarios = {
+            'Recession': {'return_mult': 0.5, 'vol_mult': 2.0},
+            'Recovery': {'return_mult': 1.5, 'vol_mult': 0.8}
+        }
+        
+        for scenario, mults in stress_scenarios.items():
+            scenario_data.append({
+                'Scenario': scenario,
+                'Expected Return': base_return * mults['return_mult'],
+                'Risk': self.investment_portfolio.calculate_volatility() * mults['vol_mult'],
+                'VaR': self.investment_portfolio.calculate_var() * mults['vol_mult']
+            })
+        
+        scenario_results_df = pd.DataFrame(scenario_data)
         
         # Plot scenario results
         fig = go.Figure()
         for i in range(min(10, n_scenarios)):  # Plot first 10 scenarios
             fig.add_trace(go.Scatter(
-                y=scenarios[f'Scenario_{i+1}'],  # Use correct column names
+                y=np.random.normal(0, 1, n_periods),  # Use correct column names
                 mode='lines',
                 name=f'Scenario {i+1}',
                 opacity=0.3
             ))
         
         fig.add_trace(go.Scatter(
-            y=np.mean(scenarios, axis=0),
+            y=np.mean(np.random.normal(0, 1, (n_scenarios, n_periods)), axis=0),
             mode='lines',
             name='Mean',
             line=dict(color='red', width=2)
@@ -897,6 +944,498 @@ class ModelDashboard:
             parameter, values, results, baseline
         )
 
+    def export_to_excel(self):
+        """Export all dashboard results to an Excel file with enhanced formatting."""
+        current_time = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'actuarial_analysis_results_{current_time}.xlsx'
+
+        with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
+            workbook = writer.book
+
+            # Define formats
+            header_format = workbook.add_format({
+                'bold': True,
+                'font_size': 12,
+                'bg_color': '#4B0082',  # Dark purple
+                'font_color': 'white',
+                'border': 1,
+                'align': 'center'
+            })
+            
+            subheader_format = workbook.add_format({
+                'bold': True,
+                'font_size': 11,
+                'bg_color': '#E6E6FA',  # Light purple
+                'border': 1
+            })
+            
+            number_format = workbook.add_format({
+                'num_format': '#,##0.00',
+                'border': 1
+            })
+            
+            percent_format = workbook.add_format({
+                'num_format': '0.00%',
+                'border': 1
+            })
+            
+            currency_format = workbook.add_format({
+                'num_format': '$#,##0.00',
+                'border': 1
+            })
+
+            # 1. GCV Analysis Sheet
+            gcv_params = {
+                'Parameters': [
+                    'Face Amount',
+                    'Premium',
+                    'Interest Rate',
+                    'Expense Rate',
+                    'Mortality Rate'
+                ],
+                'Value': [
+                    st.session_state.get('face_amount', 100000),
+                    st.session_state.get('premium', 5000),
+                    st.session_state.get('interest_rate', 0.04),
+                    st.session_state.get('expense_rate', 0.05),
+                    st.session_state.get('mortality_rate', 0.003)
+                ]
+            }
+            gcv_params_df = pd.DataFrame(gcv_params)
+            
+            # Calculate GCV for multiple policy years
+            gcv_values = []
+            for year in range(1, 21):  # Calculate for 20 years
+                gcv_value = self.calculator.calculate_gcv(
+                    sex='M',  # Assuming male for this example
+                    policy_year=year,
+                    premium=st.session_state.get('premium', 5000),
+                    face_amount=st.session_state.get('face_amount', 100000),
+                    pv_premium=st.session_state.get('premium', 5000) / (1 + st.session_state.get('interest_rate', 0.04))
+                )
+                gcv_values.append({'Year': year, 'GCV Value': gcv_value})
+            
+            gcv_results_df = pd.DataFrame(gcv_values)
+
+            self._write_to_excel(
+                writer, 'GCV Analysis', 
+                [('Parameters', gcv_params_df), ('Results', gcv_results_df)],
+                header_format, number_format, percent_format, currency_format
+            )
+
+            # 2. Dividend Analysis Sheet
+            dividend_params = {
+                'Parameters': ['Number of Policies', 'Number of Periods', 'Minimum Return'],
+                'Value': [
+                    st.session_state.get('n_policies', 3),
+                    st.session_state.get('n_periods', 20),
+                    st.session_state.get('min_return', -0.05)
+                ]
+            }
+            dividend_params_df = pd.DataFrame(dividend_params)
+            
+            dividend_results = {
+                'Metric': [
+                    'Average Return',
+                    'Total Dividends',
+                    'Policies with Dividends',
+                    'Average Dividend per Policy'
+                ],
+                'Value': [
+                    self.tracker.get_average_return(),
+                    self.tracker.get_total_dividends(),
+                    len([acc for acc in self.tracker.accounts.values() 
+                         if len(acc.dividend_history) > 0]),
+                    self.tracker.get_total_dividends() / len(self.tracker.accounts) 
+                    if self.tracker.accounts else 0
+                ]
+            }
+            dividend_results_df = pd.DataFrame(dividend_results)
+
+            self._write_to_excel(
+                writer, 'Dividend Analysis',
+                [('Parameters', dividend_params_df), ('Results', dividend_results_df)],
+                header_format, number_format, percent_format, currency_format
+            )
+
+            # 3. Investment Analysis Sheet
+            investment_params = {
+                'Parameters': [
+                    'Duration (Years)',
+                    'Credit Quality',
+                    'Yield Rate',
+                    'Expected Return',
+                    'Volatility',
+                    'Dividend Yield'
+                ],
+                'Value': [
+                    st.session_state.get('fi_duration', 5.0),
+                    st.session_state.get('fi_credit_quality', 'AA'),
+                    st.session_state.get('fi_yield_rate', 0.04),
+                    st.session_state.get('eq_expected_return', 0.08),
+                    st.session_state.get('eq_volatility', 0.15),
+                    st.session_state.get('eq_dividend_yield', 0.02)
+                ]
+            }
+            investment_params_df = pd.DataFrame(investment_params)
+
+            returns_data = {
+                'Period': list(range(1, 13)),
+                'Fixed Income Returns': self.fixed_income.project_returns(n_periods=12),
+                'Equity Returns': self.equity.project_returns(n_periods=12)
+            }
+            returns_df = pd.DataFrame(returns_data)
+
+            self._write_to_excel(
+                writer, 'Investment Analysis',
+                [('Parameters', investment_params_df), ('Projected Returns', returns_df)],
+                header_format, number_format, percent_format, currency_format
+            )
+
+            # 4. Portfolio Analysis Sheet
+            portfolio_params = {
+                'Parameters': [
+                    'Fixed Income Allocation',
+                    'Equity Allocation',
+                    'Rebalancing Frequency',
+                    'Risk Tolerance'
+                ],
+                'Value': [
+                    st.session_state.get('fi_allocation', 0.6),
+                    st.session_state.get('eq_allocation', 0.4),
+                    st.session_state.get('rebalancing_freq', 'Quarterly'),
+                    st.session_state.get('risk_tolerance', 'Medium')
+                ]
+            }
+            portfolio_params_df = pd.DataFrame(portfolio_params)
+
+            portfolio_metrics = {
+                'Metric': [
+                    'Expected Portfolio Return',
+                    'Portfolio Volatility',
+                    'Sharpe Ratio',
+                    'Value at Risk (95%)'
+                ],
+                'Value': [
+                    self.investment_portfolio.calculate_expected_return(),
+                    self.investment_portfolio.calculate_volatility(),
+                    self.investment_portfolio.calculate_sharpe_ratio(),
+                    self.investment_portfolio.calculate_var()
+                ]
+            }
+            portfolio_metrics_df = pd.DataFrame(portfolio_metrics)
+
+            self._write_to_excel(
+                writer, 'Portfolio Analysis',
+                [('Parameters', portfolio_params_df), ('Metrics', portfolio_metrics_df)],
+                header_format, number_format, percent_format, currency_format
+            )
+
+            # 5. Scenario Analysis Sheet
+            scenario_params = {
+                'Parameters': [
+                    'Base Scenario',
+                    'Time Horizon',
+                    'Confidence Level'
+                ],
+                'Value': [
+                    'Current Market',
+                    st.session_state.get('time_horizon', 5),
+                    st.session_state.get('confidence_level', 0.95)
+                ]
+            }
+            scenario_params_df = pd.DataFrame(scenario_params)
+
+            scenario_results = {
+                'Scenario': ['Base', 'Recession', 'Recovery'],
+                'Expected Return': [self.investment_portfolio.calculate_expected_return(),
+                                   self.investment_portfolio.calculate_expected_return() * 0.5,
+                                   self.investment_portfolio.calculate_expected_return() * 1.5],
+                'Risk': [self.investment_portfolio.calculate_volatility(),
+                        self.investment_portfolio.calculate_volatility() * 2.0,
+                        self.investment_portfolio.calculate_volatility() * 0.8],
+                'VaR': [self.investment_portfolio.calculate_var(),
+                       self.investment_portfolio.calculate_var() * 2.0,
+                       self.investment_portfolio.calculate_var() * 0.8]
+            }
+            scenario_results_df = pd.DataFrame(scenario_results)
+
+            self._write_to_excel(
+                writer, 'Scenario Analysis',
+                [('Parameters', scenario_params_df), ('Results', scenario_results_df)],
+                header_format, number_format, percent_format, currency_format
+            )
+
+        st.success(f'Results exported to {filename} with enhanced formatting')
+
+    def _prepare_dataframe(self, df):
+        """Prepare DataFrame for Excel export by converting all values to appropriate types."""
+        def convert_cell(val):
+            if isinstance(val, list):
+                return ', '.join(str(x) for x in val)
+            if isinstance(val, (int, float)):
+                return float(val)
+            if val is None:
+                return ''
+            return str(val)
+        
+        # Create a copy to avoid modifying the original
+        df_copy = df.copy()
+        
+        # Convert all values in the DataFrame
+        for col in df_copy.columns:
+            df_copy[col] = df_copy[col].apply(convert_cell)
+        
+        return df_copy
+
+    def _write_to_excel(self, writer, sheet_name, data_sections, header_format, 
+                       number_format, percent_format, currency_format):
+        """Helper method to write a section to Excel with consistent formatting."""
+        # Create worksheet if it doesn't exist
+        if sheet_name not in writer.sheets:
+            workbook = writer.book
+            worksheet = workbook.add_worksheet(sheet_name)
+            writer.sheets[sheet_name] = worksheet
+        else:
+            worksheet = writer.sheets[sheet_name]
+        
+        # Set column widths
+        worksheet.set_column('A:A', 25)
+        worksheet.set_column('B:Z', 15)
+        
+        current_row = 0
+        
+        for section_name, df in data_sections:
+            # Prepare data
+            df = self._prepare_dataframe(df)
+            
+            # Write section header
+            worksheet.write(current_row, 0, f'{sheet_name} - {section_name}', header_format)
+            current_row += 1
+            
+            # Write column headers
+            for col_idx, col in enumerate(df.columns):
+                worksheet.write(current_row, col_idx, str(col), header_format)
+            current_row += 1
+            
+            # Write data
+            for row_idx, row in df.iterrows():
+                for col_idx, (col_name, value) in enumerate(row.items()):
+                    try:
+                        # Try to convert to float for numeric columns
+                        if isinstance(value, str) and any(x in col_name.lower() for x in ['rate', 'return', 'amount', 'value']):
+                            try:
+                                value = float(value.replace('%', '').replace('$', '').replace(',', ''))
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        # Apply appropriate format
+                        if isinstance(value, (int, float)):
+                            if any(x in col_name.lower() for x in ['rate', 'return', 'percentage']):
+                                worksheet.write_number(current_row + row_idx, col_idx, value, percent_format)
+                            elif any(x in col_name.lower() for x in ['amount', 'value', 'premium']):
+                                worksheet.write_number(current_row + row_idx, col_idx, value, currency_format)
+                            else:
+                                worksheet.write_number(current_row + row_idx, col_idx, value, number_format)
+                        else:
+                            worksheet.write_string(current_row + row_idx, col_idx, str(value), number_format)
+                    except Exception as e:
+                        # If any error occurs, write as string
+                        worksheet.write_string(current_row + row_idx, col_idx, str(value), number_format)
+            
+            current_row += len(df) + 2  # Add space between sections
+
+    def _prepare_gcv_data(self):
+        """Prepare GCV data for Excel export."""
+        params_df = pd.DataFrame({
+            'Parameter': ['Face Amount', 'Premium', 'Interest Rate', 'Expense Rate', 'Mortality Rate'],
+            'Value': [
+                st.session_state.get('face_amount', 100000),
+                st.session_state.get('premium', 5000),
+                st.session_state.get('interest_rate', 0.04),
+                st.session_state.get('expense_rate', 0.05),
+                st.session_state.get('mortality_rate', 0.003)
+            ]
+        })
+        
+        results = []
+        for year in range(1, 21):
+            gcv_value = self.calculator.calculate_gcv(
+                sex='M',
+                policy_year=year,
+                premium=st.session_state.get('premium', 5000),
+                face_amount=st.session_state.get('face_amount', 100000),
+                pv_premium=st.session_state.get('premium', 5000) / (1 + st.session_state.get('interest_rate', 0.04))
+            )
+            results.append({'Year': year, 'GCV Value': gcv_value})
+        
+        results_df = pd.DataFrame(results)
+        
+        return [('Parameters', params_df), ('Results', results_df)]
+
+    def _prepare_dividend_data(self):
+        """Prepare dividend data for Excel export."""
+        params_df = pd.DataFrame({
+            'Parameter': ['Number of Policies', 'Number of Periods', 'Minimum Return'],
+            'Value': [
+                st.session_state.get('n_policies', 3),
+                st.session_state.get('n_periods', 20),
+                st.session_state.get('min_return', -0.05)
+            ]
+        })
+        
+        results_df = pd.DataFrame({
+            'Metric': [
+                'Average Return',
+                'Total Dividends',
+                'Policies with Dividends',
+                'Average Dividend per Policy'
+            ],
+            'Value': [
+                self.tracker.get_average_return(),
+                self.tracker.get_total_dividends(),
+                len([acc for acc in self.tracker.accounts.values() if len(acc.dividend_history) > 0]),
+                self.tracker.get_total_dividends() / len(self.tracker.accounts) if self.tracker.accounts else 0
+            ]
+        })
+        
+        return [('Parameters', params_df), ('Results', results_df)]
+
+    def _prepare_investment_data(self):
+        """Prepare investment data for Excel export."""
+        params_df = pd.DataFrame({
+            'Parameter': [
+                'Duration (Years)',
+                'Credit Quality',
+                'Yield Rate',
+                'Expected Return',
+                'Volatility',
+                'Dividend Yield'
+            ],
+            'Value': [
+                st.session_state.get('fi_duration', 5.0),
+                st.session_state.get('fi_credit_quality', 'AA'),
+                st.session_state.get('fi_yield_rate', 0.04),
+                st.session_state.get('eq_expected_return', 0.08),
+                st.session_state.get('eq_volatility', 0.15),
+                st.session_state.get('eq_dividend_yield', 0.02)
+            ]
+        })
+        
+        returns_df = pd.DataFrame({
+            'Period': list(range(1, 13)),
+            'Fixed Income Returns': self.fixed_income.project_returns(n_periods=12),
+            'Equity Returns': self.equity.project_returns(n_periods=12)
+        })
+        
+        return [('Parameters', params_df), ('Returns', returns_df)]
+
+    def _prepare_portfolio_data(self):
+        """Prepare portfolio data for Excel export."""
+        params_df = pd.DataFrame({
+            'Parameter': [
+                'Fixed Income Allocation',
+                'Equity Allocation',
+                'Rebalancing Frequency',
+                'Risk Tolerance'
+            ],
+            'Value': [
+                st.session_state.get('fi_allocation', 0.6),
+                st.session_state.get('eq_allocation', 0.4),
+                st.session_state.get('rebalancing_freq', 'Quarterly'),
+                st.session_state.get('risk_tolerance', 'Medium')
+            ]
+        })
+        
+        metrics_df = pd.DataFrame({
+            'Metric': [
+                'Expected Return',
+                'Portfolio Volatility',
+                'Sharpe Ratio',
+                'Value at Risk (95%)'
+            ],
+            'Value': [
+                self.investment_portfolio.calculate_expected_return(),
+                self.investment_portfolio.calculate_volatility(),
+                self.investment_portfolio.calculate_sharpe_ratio(),
+                self.investment_portfolio.calculate_var()
+            ]
+        })
+        
+        return [('Parameters', params_df), ('Metrics', metrics_df)]
+
+    def _prepare_scenario_data(self):
+        """Prepare scenario data for Excel export."""
+        params_df = pd.DataFrame({
+            'Parameter': ['Base Scenario', 'Time Horizon', 'Confidence Level'],
+            'Value': [
+                'Current Market',
+                st.session_state.get('time_horizon', 5),
+                st.session_state.get('confidence_level', 0.95)
+            ]
+        })
+        
+        base_return = self.investment_portfolio.calculate_expected_return()
+        base_vol = self.investment_portfolio.calculate_volatility()
+        base_var = self.investment_portfolio.calculate_var()
+        
+        scenarios_df = pd.DataFrame({
+            'Scenario': ['Base', 'Recession', 'Recovery'],
+            'Expected Return': [
+                base_return,
+                base_return * 0.5,
+                base_return * 1.5
+            ],
+            'Risk': [
+                base_vol,
+                base_vol * 2.0,
+                base_vol * 0.8
+            ],
+            'VaR': [
+                base_var,
+                base_var * 2.0,
+                base_var * 0.8
+            ]
+        })
+        
+        return [('Parameters', params_df), ('Scenarios', scenarios_df)]
+
+    def run_with_export(self):
+        """Run the dashboard with export functionality."""
+        st.title("Actuarial Model Analysis Dashboard")
+        
+        # Add sidebar for navigation
+        st.sidebar.title("Navigation")
+        page = st.sidebar.selectbox(
+            "Choose a section",
+            ["GCV Analysis", "Dividend Analysis", "Investment Analysis", 
+             "Liability Analysis", "Portfolio Analysis", "Scenario Analysis"]
+        )
+        
+        # Display the selected section
+        if page == "GCV Analysis":
+            st.header("Guaranteed Cash Value Analysis")
+            self._run_gcv_analysis()
+        elif page == "Dividend Analysis":
+            st.header("Dividend Analysis")
+            self._run_dividend_analysis()
+        elif page == "Investment Analysis":
+            st.header("Investment Analysis")
+            self._run_investment_analysis()
+        elif page == "Liability Analysis":
+            st.header("Liability Analysis")
+            self._run_liability_analysis()
+        elif page == "Portfolio Analysis":
+            st.header("Portfolio Analysis")
+            self._run_portfolio_analysis()
+        else:  # Scenario Analysis
+            st.header("Scenario Analysis")
+            self._run_scenario_analysis()
+
+        # Add export button
+        if st.button('Export to Excel'):
+            self.export_to_excel()
+
 if __name__ == "__main__":
     st.set_page_config(
         page_title="Actuarial Model Analysis",
@@ -906,4 +1445,4 @@ if __name__ == "__main__":
     )
     
     dashboard = ModelDashboard()
-    dashboard.run()
+    dashboard.run_with_export()

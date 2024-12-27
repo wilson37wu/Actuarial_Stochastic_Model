@@ -20,6 +20,16 @@ wheels/
 .installed.cfg
 *.egg
 
+# Excel files
+*.xlsx
+*.xls
+
+# Temporary files
+.tmp*
+.temp*
+*.tmp
+*.temp
+
 # Virtual Environment
 venv/
 ENV/
@@ -35,3 +45,9 @@ env/
 *.png
 *.log
 .env
+
+# Logs
+*.log
+
+# Drive upload temporary files
+.tmp.driveupload/

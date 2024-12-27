@@ -182,6 +182,34 @@ class InvestmentPortfolio:
             'sharpe_ratio': sharpe_ratio
         }
 
+    def calculate_expected_return(self) -> float:
+        """Calculate portfolio expected return based on current allocation."""
+        return sum(
+            alloc * self.asset_params[asset].expected_return
+            for asset, alloc in self.allocation.items()
+        )
+    
+    def calculate_volatility(self) -> float:
+        """Calculate portfolio volatility based on current allocation."""
+        # Simple volatility calculation without correlations
+        return np.sqrt(sum(
+            alloc * alloc * self.asset_params[asset].volatility ** 2
+            for asset, alloc in self.allocation.items()
+        ))
+    
+    def calculate_sharpe_ratio(self, risk_free_rate: float = 0.02) -> float:
+        """Calculate portfolio Sharpe ratio."""
+        excess_return = self.calculate_expected_return() - risk_free_rate
+        volatility = self.calculate_volatility()
+        return excess_return / volatility if volatility > 0 else 0
+    
+    def calculate_var(self, confidence_level: float = 0.95) -> float:
+        """Calculate Value at Risk at given confidence level."""
+        portfolio_return = self.calculate_expected_return()
+        portfolio_vol = self.calculate_volatility()
+        z_score = np.percentile(np.random.standard_normal(10000), (1 - confidence_level) * 100)
+        return -(portfolio_return + z_score * portfolio_vol)
+
 class TargetDateStrategy:
     """Target date investment strategy."""
     

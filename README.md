@@ -394,3 +394,126 @@ dask>=2021.6.0
 pytest>=6.2.0
 matplotlib>=3.4.0
 seaborn>=0.11.0
+
+```
+
+# Actuarial Stochastic Model Dashboard
+
+A comprehensive actuarial analysis dashboard built with Streamlit, providing tools for GCV calculation, dividend analysis, investment modeling, portfolio management, and scenario analysis.
+
+## Features
+
+### 1. GCV (Gross Cash Value) Analysis
+- Calculate GCV based on face amount, premium, interest rate, expense rate, and mortality rate
+- Visualize GCV progression over time
+- Export detailed GCV calculations
+
+### 2. Dividend Analysis
+- Track dividends across multiple policies
+- Calculate average returns and total dividends
+- Set minimum return thresholds
+- Visualize dividend distribution
+- Monitor recovery metrics
+
+### 3. Investment Analysis
+- Model fixed income and equity investments
+- Configure duration, credit quality, and yield rates
+- Project returns with customizable parameters
+- Analyze risk-return metrics
+
+### 4. Portfolio Management
+- Asset allocation optimization
+- Rebalancing strategy implementation
+- Risk tolerance customization
+- Performance tracking
+- Portfolio metrics calculation (Sharpe ratio, VaR)
+
+### 5. Scenario Analysis
+- Stress testing capabilities
+- Multiple scenario modeling
+- Risk assessment
+- Confidence level adjustments
+
+### 6. Excel Export
+- Comprehensive Excel reports with enhanced formatting
+- Separate sheets for each analysis type
+- Parameter documentation
+- Results visualization
+- Professional formatting with headers and proper number formats
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/Actuarial_Stochastic_Model.git
+cd Actuarial_Stochastic_Model
+```
+
+2. Create a virtual environment (recommended):
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+1. Start the dashboard:
+```bash
+streamlit run src/dashboard/dashboard.py
+```
+
+2. Navigate through different analysis sections using the sidebar
+3. Input parameters and analyze results
+4. Export results to Excel using the "Export to Excel" button
+
+## Dependencies
+
+- Python 3.8+
+- streamlit>=1.24.0
+- pandas>=1.5.0
+- numpy>=1.23.0
+- plotly>=5.15.0
+- openpyxl>=3.1.0
+- xlsxwriter>=3.1.9
+- scipy>=1.9.0
+- matplotlib>=3.6.0
+
+## Project Structure
+
+```
+Actuarial_Stochastic_Model/
+├── src/
+│   ├── dashboard/
+│   │   ├── dashboard.py
+│   │   └── tabs.py
+│   ├── investment.py
+│   ├── gcv.py
+│   └── portfolio.py
+├── tests/
+│   ├── test_dashboard.py
+│   ├── test_investment.py
+│   └── test_portfolio.py
+├── requirements.txt
+└── README.md
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Support
+
+For support, please open an issue in the GitHub repository or contact the maintainers.
