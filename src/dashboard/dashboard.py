@@ -2,6 +2,8 @@
 Interactive dashboard for actuarial model analysis.
 """
 import streamlit as st
+import sys
+from pathlib import Path
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
@@ -20,9 +22,13 @@ from src.liability import LiabilityModel
 from src.actuarial_assumptions import (
     MortalityTable, LapseAssumption, InflationAssumption,
     create_sample_mortality_table, create_sample_lapse_assumption,
-    create_sample_inflation_assumption
+    create_sample_inflation_assumption, ActuarialAssumptions
 )
-from src.investment import InvestmentPortfolio, AssetParameters, AssetClass
+from src.investment import (
+    InvestmentPortfolio, AssetParameters, AssetClass,
+    PortfolioType, InvestmentAssumptions
+)
+from src.visualizers.gcv_visualizer import GCVVisualizer
 
 @dataclass
 class BondParameters:
@@ -48,7 +54,7 @@ class ModelDashboard:
                 grading_pattern=GradingPattern.LINEAR
             )
         )
-        self.visualizer = ModelVisualizer()
+        self.visualizer = GCVVisualizer(self.calculator)
         
         # Initialize investment components
         self.fixed_income = FixedIncomeModel({
@@ -93,29 +99,24 @@ class ModelDashboard:
             )
         ]
         
+        # Initialize assumptions
+        actuarial_assumptions = ActuarialAssumptions()
+        investment_assumptions = InvestmentAssumptions()
+        
         # Initialize liability model
         self.liability_model = LiabilityModel(
-            mortality_table=create_sample_mortality_table(),
-            lapse_assumption=create_sample_lapse_assumption(),
-            inflation_assumption=create_sample_inflation_assumption(),
+            mortality_table=create_sample_mortality_table(actuarial_assumptions),
+            lapse_assumption=create_sample_lapse_assumption(actuarial_assumptions),
+            inflation_assumption=create_sample_inflation_assumption(actuarial_assumptions),
             minimum_dividend_rate=0.01,
             shareholder_cost_rate=0.02
         )
         
         # Initialize investment portfolio
         self.investment_portfolio = InvestmentPortfolio(
-            initial_allocation={
-                AssetClass.LARGE_CAP_EQUITY: 0.4,
-                AssetClass.SMALL_CAP_EQUITY: 0.2,
-                AssetClass.GOVERNMENT_BOND: 0.2,
-                AssetClass.CORPORATE_BOND: 0.2
-            },
-            asset_params={
-                AssetClass.LARGE_CAP_EQUITY: AssetParameters(expected_return=0.08, volatility=0.15),
-                AssetClass.SMALL_CAP_EQUITY: AssetParameters(expected_return=0.10, volatility=0.20),
-                AssetClass.GOVERNMENT_BOND: AssetParameters(expected_return=0.03, volatility=0.03),
-                AssetClass.CORPORATE_BOND: AssetParameters(expected_return=0.04, volatility=0.05)
-            }
+            portfolio_type=PortfolioType.BALANCED,
+            initial_balance=1000000.0,
+            assumptions=investment_assumptions
         )
         
         # Initialize sample data
@@ -210,6 +211,56 @@ class ModelDashboard:
 
     def _run_gcv_analysis(self):
         """Run GCV analysis section."""
+        # Help button at the top
+        if st.button("📖 Parameter Guide", key="gcv_help_btn"):
+            st.session_state.show_gcv_guide = not st.session_state.get('show_gcv_guide', False)
+        
+        # Show parameter guide if enabled
+        if st.session_state.get('show_gcv_guide', False):
+            st.markdown("""
+            ## GCV Parameter Guide
+            
+            ### Basic Parameters
+            - **Base Percentage** (60-80%)
+              - Percentage of present value of premiums used for GCV calculations
+              - Higher values = more generous guaranteed values
+              - Example: 70% means GCV is based on 70% of premium present value
+            
+            - **Initial GCV %** (40-60%)
+              - Starting guaranteed cash value as % of face amount
+              - Example: For $100,000 face amount, 50% = $50,000 initial GCV
+              - Higher values are more attractive but increase cost
+            
+            - **Grading Years** (10-20 years)
+              - Period over which GCV reduces to minimum
+              - Longer period = smoother reduction
+              - Shorter period = lower cost
+            
+            - **Minimum GCV %** (5-10%)
+              - Floor for guaranteed values
+              - Higher values provide better guarantees but increase cost
+            
+            ### Grading Patterns
+            - **Linear**: Simple straight-line reduction
+            - **S-Curve**: Slower reduction in early/late years
+            - **Stepwise**: Distinct steps at specific durations
+            - **Target IRR**: Designed to achieve specific IRR
+            
+            ### Product Parameters
+            - **Annual Premium**: Yearly premium payment
+              - Higher premium = higher guaranteed values
+              - Typical range varies by face amount
+            
+            - **Face Amount**: Death benefit amount
+              - Base for GCV percentage calculations
+              - Typical range: 5-20x annual premium
+            
+            - **Valuation Rate** (2-5%)
+              - Interest rate for present value calculations
+              - Higher rate reduces present values
+            """)
+            st.markdown("---")  # Add separator after guide
+        
         # Parameters
         col1, col2 = st.columns(2)
         
@@ -1088,7 +1139,7 @@ class ModelDashboard:
 
             self._write_to_excel(
                 writer, 'Investment Analysis',
-                [('Parameters', investment_params_df), ('Projected Returns', returns_df)],
+                [('Parameters', investment_params_df), ('Returns', returns_df)],
                 header_format, number_format, percent_format, currency_format
             )
 
@@ -1111,7 +1162,7 @@ class ModelDashboard:
 
             portfolio_metrics = {
                 'Metric': [
-                    'Expected Portfolio Return',
+                    'Expected Return',
                     'Portfolio Volatility',
                     'Sharpe Ratio',
                     'Value at Risk (95%)'
@@ -1294,8 +1345,10 @@ class ModelDashboard:
             'Value': [
                 self.tracker.get_average_return(),
                 self.tracker.get_total_dividends(),
-                len([acc for acc in self.tracker.accounts.values() if len(acc.dividend_history) > 0]),
-                self.tracker.get_total_dividends() / len(self.tracker.accounts) if self.tracker.accounts else 0
+                len([acc for acc in self.tracker.accounts.values() 
+                     if len(acc.dividend_history) > 0]),
+                self.tracker.get_total_dividends() / len(self.tracker.accounts) 
+                if self.tracker.accounts else 0
             ]
         })
         

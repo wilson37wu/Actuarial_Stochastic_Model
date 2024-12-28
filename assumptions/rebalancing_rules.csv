@@ -1,0 +1,7 @@
+portfolio_type,rebalancing_frequency,threshold_type,threshold_value
+conservative,quarterly,absolute,0.05
+balanced,quarterly,absolute,0.05
+aggressive,quarterly,absolute,0.05
+conservative,monthly,relative,0.10
+balanced,monthly,relative,0.10
+aggressive,monthly,relative,0.10

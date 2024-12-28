@@ -3,6 +3,7 @@ Module for actuarial assumptions.
 """
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -13,12 +14,219 @@ from .enums import (
     UnderwritingClass, ProductType
 )
 
+class ActuarialAssumptions:
+    """Class to manage actuarial assumptions loaded from external files."""
+    
+    # Default values in case files are missing or corrupted
+    DEFAULT_MORTALITY = {
+        'male': {0: 0.00509, 20: 0.00095, 40: 0.00257, 60: 0.01843, 80: 0.11474},
+        'female': {0: 0.00418, 20: 0.00037, 40: 0.00162, 60: 0.01046, 80: 0.06456}
+    }
+    
+    DEFAULT_EXPENSES = {
+        'acquisition_expense': 0.05,
+        'maintenance_expense': 0.02,
+        'investment_expense': 0.001,
+        'claim_expense': 0.01
+    }
+    
+    DEFAULT_INTEREST = {
+        'risk_free_rate': 0.03,
+        'credit_spread_aa': 0.01,
+        'credit_spread_a': 0.02,
+        'credit_spread_bbb': 0.03,
+        'equity_risk_premium': 0.06,
+        'real_estate_risk_premium': 0.04,
+        'liquidity_premium': 0.005,
+        'inflation_rate': 0.02
+    }
+    
+    DEFAULT_LAPSE = {
+        1: {'base': 0.15, 'shock_up': 0.30, 'shock_down': 0.075},
+        5: {'base': 0.07, 'shock_up': 0.14, 'shock_down': 0.035},
+        10: {'base': 0.03, 'shock_up': 0.06, 'shock_down': 0.015}
+    }
+
+    def __init__(self, assumption_dir=None):
+        """Initialize assumptions from external files or defaults."""
+        if assumption_dir is None:
+            assumption_dir = Path(__file__).parent.parent / 'assumptions'
+        self.assumption_dir = Path(assumption_dir)
+        
+        # Load assumptions
+        self._load_mortality_rates()
+        self._load_expense_rates()
+        self._load_interest_rates()
+        self._load_lapse_rates()
+
+    def _load_mortality_rates(self):
+        """Load mortality rates from CSV file or use defaults."""
+        try:
+            file_path = self.assumption_dir / 'mortality_rates.csv'
+            if file_path.exists():
+                df = pd.read_csv(file_path)
+                self.mortality_rates = {
+                    'male': dict(zip(df['age'], df['male_rate'])),
+                    'female': dict(zip(df['age'], df['female_rate']))
+                }
+            else:
+                self.mortality_rates = self.DEFAULT_MORTALITY
+        except Exception as e:
+            print(f"Error loading mortality rates: {e}")
+            self.mortality_rates = self.DEFAULT_MORTALITY
+
+    def _load_expense_rates(self):
+        """Load expense rates from CSV file or use defaults."""
+        try:
+            file_path = self.assumption_dir / 'expense_rates.csv'
+            if file_path.exists():
+                df = pd.read_csv(file_path)
+                self.expense_rates = dict(zip(df['expense_type'], df['rate']))
+            else:
+                self.expense_rates = self.DEFAULT_EXPENSES
+        except Exception as e:
+            print(f"Error loading expense rates: {e}")
+            self.expense_rates = self.DEFAULT_EXPENSES
+
+    def _load_interest_rates(self):
+        """Load interest rates from CSV file or use defaults."""
+        try:
+            file_path = self.assumption_dir / 'interest_rates.csv'
+            if file_path.exists():
+                df = pd.read_csv(file_path)
+                self.interest_rates = dict(zip(df['rate_type'], df['value']))
+            else:
+                self.interest_rates = self.DEFAULT_INTEREST
+        except Exception as e:
+            print(f"Error loading interest rates: {e}")
+            self.interest_rates = self.DEFAULT_INTEREST
+
+    def _load_lapse_rates(self):
+        """Load lapse rates from CSV file or use defaults."""
+        try:
+            file_path = self.assumption_dir / 'lapse_rates.csv'
+            if file_path.exists():
+                df = pd.read_csv(file_path)
+                self.lapse_rates = {}
+                for _, row in df.iterrows():
+                    year = row['policy_year']
+                    if year == '10+':
+                        year = 10
+                    self.lapse_rates[int(year)] = {
+                        'base': row['base_rate'],
+                        'shock_up': row['shock_up'],
+                        'shock_down': row['shock_down']
+                    }
+            else:
+                self.lapse_rates = self.DEFAULT_LAPSE
+        except Exception as e:
+            print(f"Error loading lapse rates: {e}")
+            self.lapse_rates = self.DEFAULT_LAPSE
+
+    def get_mortality_rate(self, age, sex='M'):
+        """Get mortality rate for given age and sex."""
+        sex_key = 'male' if sex.upper() == 'M' else 'female'
+        rates = self.mortality_rates[sex_key]
+        
+        # Find closest age if exact age not in table
+        available_ages = sorted(rates.keys())
+        if age in rates:
+            return rates[age]
+        elif age < min(available_ages):
+            return rates[min(available_ages)]
+        elif age > max(available_ages):
+            return rates[max(available_ages)]
+        else:
+            # Linear interpolation
+            lower_age = max(x for x in available_ages if x < age)
+            upper_age = min(x for x in available_ages if x > age)
+            rate_diff = rates[upper_age] - rates[lower_age]
+            age_diff = upper_age - lower_age
+            return rates[lower_age] + rate_diff * (age - lower_age) / age_diff
+
+    def get_expense_rate(self, expense_type):
+        """Get expense rate for given type."""
+        return self.expense_rates.get(expense_type, 0.0)
+
+    def get_interest_rate(self, rate_type):
+        """Get interest rate for given type."""
+        return self.interest_rates.get(rate_type, 0.0)
+
+    def get_lapse_rate(self, policy_year, scenario='base'):
+        """Get lapse rate for given policy year and scenario."""
+        if policy_year >= 10:
+            policy_year = 10
+            
+        # Find closest year if exact year not in table
+        available_years = sorted(self.lapse_rates.keys())
+        if policy_year in self.lapse_rates:
+            return self.lapse_rates[policy_year][scenario]
+        else:
+            # Linear interpolation
+            lower_year = max(x for x in available_years if x < policy_year)
+            upper_year = min(x for x in available_years if x > policy_year)
+            rate_diff = (self.lapse_rates[upper_year][scenario] - 
+                        self.lapse_rates[lower_year][scenario])
+            year_diff = upper_year - lower_year
+            return (self.lapse_rates[lower_year][scenario] + 
+                   rate_diff * (policy_year - lower_year) / year_diff)
+
+    def export_assumptions(self, output_dir=None):
+        """Export current assumptions to CSV files."""
+        if output_dir is None:
+            output_dir = self.assumption_dir
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Export mortality rates
+        mortality_data = []
+        ages = sorted(set(list(self.mortality_rates['male'].keys()) + 
+                        list(self.mortality_rates['female'].keys())))
+        for age in ages:
+            mortality_data.append({
+                'age': age,
+                'male_rate': self.mortality_rates['male'].get(age, np.nan),
+                'female_rate': self.mortality_rates['female'].get(age, np.nan)
+            })
+        pd.DataFrame(mortality_data).to_csv(
+            output_dir / 'mortality_rates.csv', index=False)
+
+        # Export expense rates
+        expense_data = [
+            {'expense_type': k, 'rate': v, 'unit': 'per_premium'}
+            for k, v in self.expense_rates.items()
+        ]
+        pd.DataFrame(expense_data).to_csv(
+            output_dir / 'expense_rates.csv', index=False)
+
+        # Export interest rates
+        interest_data = [
+            {'rate_type': k, 'value': v, 'duration': 1}
+            for k, v in self.interest_rates.items()
+        ]
+        pd.DataFrame(interest_data).to_csv(
+            output_dir / 'interest_rates.csv', index=False)
+
+        # Export lapse rates
+        lapse_data = [
+            {
+                'policy_year': '10+' if k == 10 else k,
+                'base_rate': v['base'],
+                'shock_up': v['shock_up'],
+                'shock_down': v['shock_down']
+            }
+            for k, v in self.lapse_rates.items()
+        ]
+        pd.DataFrame(lapse_data).to_csv(
+            output_dir / 'lapse_rates.csv', index=False)
+
 class MortalityTable:
     """Mortality table with rates by age and characteristics."""
     
-    def __init__(self, base_rates: Dict[int, float]):
+    def __init__(self, base_rates: Dict[int, float], assumptions: ActuarialAssumptions):
         """Initialize mortality table."""
         self.base_rates = base_rates
+        self.assumptions = assumptions
         self._create_interpolator()
         
         # Adjustment factors
@@ -124,9 +332,10 @@ class MortalityTable:
 class LapseAssumption:
     """Lapse rate assumptions."""
     
-    def __init__(self, base_rates: Dict[int, float]):
+    def __init__(self, base_rates: Dict[int, float], assumptions: ActuarialAssumptions):
         """Initialize lapse assumption."""
         self.base_rates = base_rates
+        self.assumptions = assumptions
         self._create_interpolator()
         
         # Product type factors
@@ -192,11 +401,13 @@ class InflationAssumption:
     def __init__(self,
                  base_rate: float,
                  wage_inflation: Optional[float] = None,
-                 medical_inflation: Optional[float] = None):
+                 medical_inflation: Optional[float] = None,
+                 assumptions: ActuarialAssumptions = None):
         """Initialize inflation assumption."""
         self.base_rate = base_rate
         self.wage_inflation = wage_inflation or base_rate * 1.5
         self.medical_inflation = medical_inflation or base_rate * 2.0
+        self.assumptions = assumptions
     
     def get_rate(self,
                  projection_year: int,
@@ -337,7 +548,7 @@ class MortalityFactors:
         }
         return occupation_factors[occupation_class]
 
-def create_sample_mortality_table() -> MortalityTable:
+def create_sample_mortality_table(assumptions: ActuarialAssumptions) -> MortalityTable:
     """Create a sample mortality table with select and ultimate rates."""
     start_age = 20
     max_age = 100  # Maximum age in the table
@@ -375,10 +586,11 @@ def create_sample_mortality_table() -> MortalityTable:
     )
     
     return MortalityTable(
-        base_rates=ultimate_rates
+        base_rates=ultimate_rates,
+        assumptions=assumptions
     )
 
-def create_sample_lapse_assumption() -> LapseAssumption:
+def create_sample_lapse_assumption(assumptions: ActuarialAssumptions) -> LapseAssumption:
     """Create sample lapse assumptions."""
     return LapseAssumption(
         base_rates={
@@ -387,13 +599,15 @@ def create_sample_lapse_assumption() -> LapseAssumption:
             3: 0.03,  # 3% lapse rate in third year
             4: 0.02,  # 2% lapse rate in fourth year
             5: 0.01,  # 1% lapse rate in fifth year
-        }
+        },
+        assumptions=assumptions
     )
 
-def create_sample_inflation_assumption() -> InflationAssumption:
+def create_sample_inflation_assumption(assumptions: ActuarialAssumptions) -> InflationAssumption:
     """Create sample inflation assumptions."""
     return InflationAssumption(
         base_rate=0.02,  # 2% base inflation
         wage_inflation=0.03,  # 3% wage inflation
-        medical_inflation=0.04  # 4% medical inflation
+        medical_inflation=0.04,  # 4% medical inflation
+        assumptions=assumptions
     )

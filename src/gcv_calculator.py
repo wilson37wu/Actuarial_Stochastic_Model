@@ -6,12 +6,14 @@ This module implements various GCV calculation methodologies:
 2. S-Curve Grading: Slower initial reduction, faster middle years, slower final years
 3. Step-wise Grading: Distinct steps at specific durations
 4. Product-specific patterns for different whole life variants
+5. Target IRR: Grading pattern to achieve target IRR at specified duration
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Union
 from datetime import date
 import numpy as np
+from numpy.polynomial import Polynomial
 
 class GradingPattern(Enum):
     """Available GCV grading patterns."""
@@ -23,6 +25,7 @@ class GradingPattern(Enum):
     DUAL_PHASE = "dual_phase"    # Different rates for early/late years
     DYNAMIC = "dynamic"          # Pattern adjusts based on duration
     HYBRID = "hybrid"           # Combination of multiple patterns
+    TARGET_IRR = "target_irr"   # Pattern to achieve target IRR
 
 class ProductVariant(Enum):
     """Whole life product variants affecting GCV calculation."""
@@ -63,6 +66,19 @@ class GCVParameters:
     grading_pattern: GradingPattern = GradingPattern.LINEAR
     product_variant: ProductVariant = ProductVariant.STANDARD
     stepwise_points: Optional[Dict[int, float]] = None  # Year to factor for stepwise
+    
+    # Target IRR parameters
+    target_irr: Optional[float] = None  # Target IRR to achieve
+    target_year: Optional[int] = None   # Year by which to achieve target IRR
+    
+    # External table parameters
+    external_table: Optional[Dict[str, Dict[int, float]]] = None  # Product -> Year -> Factor
+    interpolation_method: str = "linear"  # linear, cubic, or nearest
+    
+    # Advanced grading parameters
+    pattern_weights: Optional[Dict[GradingPattern, float]] = None  # For hybrid pattern
+    custom_function: Optional[callable] = None  # For custom pattern
+    dynamic_adjustments: Optional[Dict[str, float]] = None  # For dynamic pattern
 
 class GCVCalculator:
     """Calculator for Guaranteed Cash Values."""
@@ -84,7 +100,97 @@ class GCVCalculator:
         
         if external_factors:
             external_factors.validate()
+            
+    def calculate_irr(self, premiums: List[float], cash_values: List[float]) -> float:
+        """Calculate the Internal Rate of Return (IRR) for a series of cash flows.
+        
+        Args:
+            premiums: List of premium payments (negative cash flows)
+            cash_values: List of guaranteed cash values (positive cash flows)
+            
+        Returns:
+            Float: The IRR as a decimal (e.g., 0.05 for 5%)
+        """
+        cash_flows = [-p for p in premiums]  # Convert premiums to negative cash flows
+        cash_flows.extend(cash_values)       # Add positive cash flows from GCV
+        
+        # Function to calculate NPV given a rate
+        def npv(rate):
+            return sum(cf / (1 + rate) ** t for t, cf in enumerate(cash_flows))
+        
+        # Use numerical methods to find IRR (rate where NPV = 0)
+        from scipy.optimize import newton
+        try:
+            irr = newton(npv, x0=0.05)  # Start with 5% guess
+            return max(irr, -1)  # IRR cannot be less than -100%
+        except:
+            return float('-inf')  # Return -infinity if IRR cannot be found
+            
+    def _solve_for_target_irr(self, 
+                             premium: float,
+                             face_amount: float,
+                             target_irr: float,
+                             target_year: int) -> List[float]:
+        """Solve for GCV factors that achieve the target IRR by target year.
+        
+        Uses optimization to find a smooth curve of GCV factors that:
+        1. Starts at initial_gcv_percentage
+        2. Achieves target IRR by target year
+        3. Maintains minimum GCV requirements
+        """
+        def objective(coeffs):
+            # Generate GCV factors using polynomial
+            poly = Polynomial(coeffs)
+            years = range(target_year + 1)
+            factors = [max(self.parameters.minimum_gcv_percentage, 
+                         min(self.parameters.initial_gcv_percentage, poly(t)))
+                      for t in years]
+            
+            # Calculate IRR
+            premiums = [premium] * target_year
+            cash_values = [f * face_amount for f in factors]
+            achieved_irr = self.calculate_irr(premiums, cash_values)
+            
+            # Penalty for deviation from target IRR
+            irr_penalty = 100 * (achieved_irr - target_irr) ** 2
+            
+            # Penalty for non-smoothness
+            smoothness_penalty = sum((factors[i+1] - factors[i]) ** 2 
+                                   for i in range(len(factors)-1))
+            
+            return irr_penalty + smoothness_penalty
+        
+        # Initial guess: linear coefficients
+        initial_coeffs = [self.parameters.initial_gcv_percentage,
+                         -(self.parameters.initial_gcv_percentage - 
+                           self.parameters.minimum_gcv_percentage) / target_year]
+        
+        # Optimize
+        from scipy.optimize import minimize
+        result = minimize(objective, initial_coeffs, method='Nelder-Mead')
+        
+        # Generate final factors
+        poly = Polynomial(result.x)
+        return [max(self.parameters.minimum_gcv_percentage,
+                   min(self.parameters.initial_gcv_percentage, poly(t)))
+                for t in range(target_year + 1)]
     
+    def _apply_target_irr_grading(self, policy_year: int, premium: float, face_amount: float) -> float:
+        """Apply grading pattern to achieve target IRR."""
+        if not (self.parameters.target_irr and self.parameters.target_year):
+            return self._apply_linear_grading(policy_year)
+            
+        if not hasattr(self, '_target_irr_factors'):
+            self._target_irr_factors = self._solve_for_target_irr(
+                premium, face_amount,
+                self.parameters.target_irr,
+                self.parameters.target_year
+            )
+            
+        if policy_year >= len(self._target_irr_factors):
+            return self._target_irr_factors[-1]
+        return self._target_irr_factors[policy_year]
+
     def _apply_s_curve_grading(self, policy_year: int) -> float:
         """Apply S-curve grading pattern.
         
@@ -284,6 +390,8 @@ class GCVCalculator:
             grading_factor = self._apply_dynamic_grading(policy_year)
         elif self.parameters.grading_pattern == GradingPattern.HYBRID:
             grading_factor = self._apply_hybrid_grading(policy_year)
+        elif self.parameters.grading_pattern == GradingPattern.TARGET_IRR:
+            grading_factor = self._apply_target_irr_grading(policy_year, premium, face_amount)
         else:  # LINEAR
             grading_factor = self._apply_linear_grading(policy_year)
         

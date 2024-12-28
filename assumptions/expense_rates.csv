@@ -1,0 +1,5 @@
+expense_type,rate,unit
+acquisition_expense,0.05,per_premium
+maintenance_expense,0.02,per_premium
+investment_expense,0.001,per_assets
+claim_expense,0.01,per_claim

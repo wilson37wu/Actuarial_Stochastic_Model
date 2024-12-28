@@ -1,0 +1,9 @@
+asset_class,fixed_cost,variable_cost,minimum_cost,maximum_cost
+government_bonds,0.0001,0.0005,5,1000
+corporate_bonds,0.0002,0.0010,10,2000
+public_equity,0.0003,0.0015,15,3000
+real_estate,0.0100,0.0200,1000,10000
+private_equity,0.0150,0.0250,2000,20000
+hedge_funds,0.0200,0.0300,2500,25000
+commodities,0.0005,0.0020,20,4000
+cash,0.0000,0.0001,1,100

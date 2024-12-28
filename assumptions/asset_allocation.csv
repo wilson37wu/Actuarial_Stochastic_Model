@@ -1,0 +1,10 @@
+portfolio_type,asset_class,target_allocation,min_allocation,max_allocation
+conservative,government_bonds,0.60,0.50,0.70
+conservative,corporate_bonds,0.30,0.20,0.40
+conservative,public_equity,0.10,0.05,0.15
+balanced,government_bonds,0.40,0.30,0.50
+balanced,corporate_bonds,0.30,0.20,0.40
+balanced,public_equity,0.30,0.20,0.40
+aggressive,government_bonds,0.20,0.10,0.30
+aggressive,corporate_bonds,0.20,0.10,0.30
+aggressive,public_equity,0.60,0.50,0.70

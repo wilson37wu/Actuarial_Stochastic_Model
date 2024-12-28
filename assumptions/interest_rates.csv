@@ -1,0 +1,9 @@
+rate_type,value,duration
+risk_free_rate,0.03,1
+credit_spread_aa,0.01,1
+credit_spread_a,0.02,1
+credit_spread_bbb,0.03,1
+equity_risk_premium,0.06,1
+real_estate_risk_premium,0.04,1
+liquidity_premium,0.005,1
+inflation_rate,0.02,1
