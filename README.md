@@ -1,40 +1,30 @@
 # Stochastic Actuarial Model for Insurance Contract Liability
 
 ## Project Overview
-Implementation of a stochastic model for insurance contract liability evaluation with integrated asset-liability modeling capabilities.
+Implementation of a stochastic model for insurance contract liability evaluation with integrated asset-liability modeling capabilities. The model features advanced economic scenario generation, dynamic cash flow modeling, and comprehensive risk metrics calculation.
 
-## Project Timeline and Milestones
+## Latest Features (December 2024)
 
-### Phase 1: Setup and Requirements (2 weeks)
-- Define detailed technical specifications
-- Set up development environment
-- Design system architecture
-- Document data requirements
+### Economic Scenario Generation
+- Hull-White interest rate model for short and long rates
+- Merton jump-diffusion model for equity returns
+- Jarrow-Turnbull model for credit risk
+- Heston stochastic volatility model
+- Correlated inflation scenarios
 
-### Phase 2: Asset Model Development (6 weeks)
-- Develop asset cash flow projection models
-- Implement asset allocation strategy
-- Create reinvestment logic
-- Build credit risk modeling component
-- Unit testing and validation
+### Cash Flow Modeling
+- Dynamic policy behavior modeling
+- Mortality and lapse assumptions
+- Premium and benefit calculations
+- Surrender value determination
+- Expense modeling
 
-### Phase 3: Asset-Liability Integration (4 weeks)
-- Integrate existing liability cash flow model
-- Develop dynamic asset-liability matching logic
-- Implement rebalancing strategies
-- Create reporting framework
-
-### Phase 4: Stochastic Engine (4 weeks)
-- Implement scenario generator interface
-- Develop parallel processing capabilities
-- Create risk metric calculations
-- Implement validation checks
-
-### Phase 5: Testing and Validation (4 weeks)
-- Comprehensive testing
-- Model validation
-- Documentation
-- User acceptance testing
+### Risk Metrics
+- Value at Risk (VaR) calculations
+- Conditional Tail Expectation (CTE)
+- NPV distribution analysis
+- Sensitivity testing capabilities
+- Stress scenario analysis
 
 ## Technical Requirements
 
@@ -43,403 +33,13 @@ Implementation of a stochastic model for insurance contract liability evaluation
 - NumPy for numerical computations
 - Pandas for data manipulation
 - SciPy for statistical functions
-- Dask for parallel processing
+- Streamlit for dashboard interface
 - PyTest for testing
-- Git for version control
 
 ### Hardware Requirements
-- Multi-core processor for parallel scenario processing
-- Minimum 32GB RAM recommended
-- SSD storage for large dataset handling
-
-## Key Model Components
-
-### Asset Modeling
-1. Fixed Income
-   - Bond cash flow projection
-   - Credit risk modeling
-   - Reinvestment strategy
-   - Duration matching
-
-2. Equity
-   - Dividend modeling
-   - Capital gains/losses
-   - Rebalancing rules
-
-3. Other Assets
-   - Real estate
-   - Alternative investments
-   - Cash and equivalents
-
-### Integration Components
-1. Dynamic Asset-Liability Management
-   - Cash flow matching
-   - Duration/convexity matching
-   - Rebalancing triggers
-
-2. Risk Metrics
-   - Value at Risk (VaR)
-   - Conditional Tail Expectation (CTE)
-   - Duration/convexity measures
-   - Key rate durations
-
-## Modeling Considerations
-
-### Actuarial Aspects
-1. Liability Model Integration
-   - Mortality assumptions
-   - Lapse assumptions
-   - Expense assumptions
-   - Option/guarantee valuation
-
-2. Economic Scenario Integration
-   - Interest rate scenarios
-   - Credit spread scenarios
-   - Equity return scenarios
-   - Correlation modeling
-
-### Risk Management
-1. Risk Metrics Calculation
-   - Capital requirements
-   - Solvency measures
-   - Sensitivity analysis
-
-2. Model Governance
-   - Documentation requirements
-   - Validation procedures
-   - Audit trail
-   - Change control
-
-## Recent Updates
-
-### December 2024 Updates
-- Enhanced liability projection capabilities with adjustable parameters:
-  - Mortality multiplier for sensitivity testing
-  - Base lapse rate adjustments
-  - Inflation rate scenarios
-- Improved investment portfolio management:
-  - Added bond portfolio tracking in FixedIncomeModel
-  - Enhanced equity allocation strategies
-  - Integrated dynamic asset allocation updates
-- Enhanced dashboard visualization:
-  - Split liability projections into net and present value views
-  - Added detailed cash flow component analysis
-  - Improved portfolio composition display
-
-## Features
-
-### Dashboard Components
-1. **Liability Analysis**
-   - Interactive mortality, lapse, and inflation adjustments
-   - Net liability and present value projections
-   - Detailed cash flow component breakdown
-   
-2. **Investment Analysis**
-   - Fixed income portfolio management
-   - Equity allocation strategies
-   - Dynamic portfolio rebalancing
-   
-3. **Asset-Liability Management**
-   - Integrated asset-liability projections
-   - Dynamic hedging strategies
-   - Risk metric calculations
-
-### Model Components
-1. **Fixed Income Model**
-   - Bond portfolio management
-   - Credit transition modeling
-   - Default recovery calculations
-   
-2. **Equity Model**
-   - Return projections
-   - Dividend modeling
-   - Volatility adjustments
-
-3. **Liability Model**
-   - Mortality assumptions
-   - Lapse behavior
-   - Inflation impacts
-
-## Dashboard Overview
-The dashboard provides an interactive interface for analyzing actuarial models, focusing on dividend tracking, investment returns, and liability assessments. It allows users to input various parameters and visualize the results dynamically.
-
-## Installation
-Ensure you have Python 3.11 installed and set up a virtual environment. Install the required packages using:
-
-```bash
-pip install -r requirements.txt
-```
-
-## Running the Dashboard
-To run the Streamlit dashboard, execute the following command in your terminal:
-
-```bash
-streamlit run src/dashboard/dashboard.py
-```
-
-## Dashboard Features
-1. **Dividend Analysis**: Analyze dividend payments based on user-defined parameters. Users can set the number of policies, periods, and minimum return to simulate different scenarios.
-2. **Investment Analysis**: Evaluate projected returns for fixed income and equity portfolios. Users can adjust parameters such as duration, credit quality, expected return, and volatility.
-3. **Liability Analysis**: Assess liability metrics and visualize recovery metrics over time.
-
-## Input Parameters
-### Dividend Analysis
-- **Number of Policies**: Total number of policies to simulate (1-10).
-- **Number of Periods**: Time periods for the analysis (5-100).
-- **Minimum Return**: The minimum return threshold for the simulation (-10% to 0%).
-
-### Investment Analysis
-- **Duration**: Duration of the fixed income portfolio (1-10 years).
-- **Credit Quality**: Credit quality of the fixed income assets (AAA, AA, A, BBB).
-- **Yield Rate**: Expected yield rate for fixed income assets (0.01 to 0.10).
-- **Expected Return**: Expected return for equity investments (0.05 to 0.15).
-- **Volatility**: Expected volatility for equity investments (0.10 to 0.30).
-- **Dividend Yield**: Expected dividend yield for equity investments (0.01 to 0.05).
-
-## Expected Outputs
-- **Dividend Analysis Results**: Metrics including average return, total dividends, policies with dividends, and average dividend per policy.
-- **Investment Analysis Charts**: Projected returns for fixed income and equity portfolios displayed as line charts.
-- **Liability Analysis Metrics**: Recovery metrics visualized over time.
-
-## Contributing
-Contributions are welcome! Please submit a pull request or open an issue for discussion.
-
-## License
-This project is licensed under the MIT License.
-
-## Data Specifications
-
-### Economic Scenarios
-
-Economic scenarios should be provided as a pandas DataFrame with the following structure:
-
-```python
-scenarios_df = pd.DataFrame({
-    'equity_return': float[],      # Monthly/Annual equity market returns (e.g., 0.08 for 8%)
-    'risk_free_rate': float[],     # Risk-free rates (e.g., 0.03 for 3%)
-}, index=pd.DatetimeIndex)         # DatetimeIndex with projection dates
-```
-
-### Fixed Income Specifications
-
-#### Bond Data Structure
-Each bond should be instantiated as a `Bond` class with the following attributes:
-
-```python
-Bond(
-    id: str,                    # Unique identifier for the bond
-    par_value: float,           # Face value of the bond
-    coupon_rate: float,         # Annual coupon rate (e.g., 0.035 for 3.5%)
-    maturity_date: date,        # Maturity date
-    payment_frequency: int,      # Number of payments per year (e.g., 2 for semi-annual)
-    credit_rating: str,         # Credit rating (e.g., 'AAA', 'AA', etc.)
-    issue_date: date,           # Date of issuance
-    purchase_price: float,      # Price at which the bond was purchased
-    currency: str = 'USD'       # Currency of the bond (default: 'USD')
-)
-```
-
-#### Fixed Income Model Configuration
-The fixed income model requires configuration for credit spreads:
-
-```python
-fixed_income_config = {
-    'credit_spread': {
-        'AAA': float,           # Credit spread for AAA-rated bonds
-        'AA': float,           # Credit spread for AA-rated bonds
-        'A': float,            # Credit spread for A-rated bonds
-        # ... other ratings
-    }
-}
-```
-
-### Public Equity Specifications
-
-#### Equity Position Data Structure
-Each equity position should be instantiated as an `Equity` class with the following attributes:
-
-```python
-Equity(
-    id: str,                    # Unique identifier for the equity
-    quantity: float,            # Number of shares
-    initial_price: float,       # Price per share at start of projection
-    dividend_yield: float,      # Annual dividend yield (e.g., 0.02 for 2%)
-    beta: float,               # Market beta of the equity
-    sector: str,               # Industry sector
-    purchase_date: date,        # Date of purchase
-    currency: str = 'USD'       # Currency (default: 'USD')
-)
-```
-
-#### Equity Model Configuration
-The equity model requires configuration for market parameters:
-
-```python
-equity_config = {
-    'market_volatility': float,     # Overall market volatility (e.g., 0.15 for 15%)
-    'sector_correlations': {        # Correlation matrix between sectors
-        'Technology': {
-            'Technology': 1.0,
-            'Financial': float,
-            'Healthcare': float,
-            # ... other sectors
-        },
-        # ... other sectors
-    }
-}
-```
-
-### Liability Specifications
-
-#### Insurance Contract Data Structure
-Each insurance contract should be instantiated as an `InsuranceContract` class with the following attributes:
-
-```python
-InsuranceContract(
-    id: str,                    # Unique identifier for the contract
-    issue_date: date,           # Contract issue date
-    maturity_date: date,        # Contract maturity date
-    premium_pattern: Dict[date, float],  # Premium cash flows {date: amount}
-    benefit_pattern: Dict[date, float],  # Benefit cash flows {date: amount}
-    expense_pattern: Dict[date, float],  # Expense cash flows {date: amount}
-    currency: str = 'USD'       # Currency of the contract (default: 'USD')
-)
-```
-
-#### Liability Cash Flow Output
-The liability model produces a DataFrame with the following structure:
-
-```python
-liability_cf = pd.DataFrame({
-    'date': date,              # Projection date
-    'contract_id': str,        # Contract identifier
-    'premium': float,          # Premium cash flow
-    'benefit': float,          # Benefit cash flow
-    'expense': float,          # Expense cash flow
-    'net_cashflow': float      # Net cash flow (premium - benefit - expense)
-})
-```
-
-### Portfolio Projection Parameters
-
-When projecting the entire portfolio, the following parameters can be specified:
-
-```python
-project_portfolio(
-    bonds: List[Bond],              # List of bond positions
-    equities: List[Equity],         # List of equity positions
-    valuation_date: date,           # Starting date for projections
-    scenario_idx: int,              # Index of scenario to use
-    projection_years: int = 100,    # Number of years to project (default: 100)
-    frequency: str = 'monthly',     # 'monthly' or 'annual'
-    output_path: Optional[str]      # Path for Excel output (optional)
-)
-```
-
-### Output Specifications
-
-The model produces three main types of output DataFrames:
-
-#### 1. Fixed Income Cash Flows
-```python
-fixed_income_cf = pd.DataFrame({
-    'date': date,                   # Payment date
-    'instrument_id': str,           # Bond identifier
-    'coupon_payment': float,        # Coupon payment amount
-    'principal_payment': float,     # Principal payment amount
-    'total_cashflow': float,        # Total payment
-    'market_value': float,          # Current market value
-    'total_return': float           # Total return for the period
-})
-```
-
-#### 2. Equity Cash Flows
-```python
-equity_cf = pd.DataFrame({
-    'date': date,                   # Projection date
-    'instrument_id': str,           # Equity identifier
-    'market_value': float,          # Current market value
-    'dividend_amount': float,       # Dividend payment
-    'total_return': float           # Total return including price appreciation
-})
-```
-
-#### 3. Portfolio Summary
-```python
-portfolio_cf = pd.DataFrame({
-    'date': date,                   # Projection date
-    'asset_type': str,              # 'fixed_income', 'equity', or 'total_portfolio'
-    'market_value': float,          # Total market value
-    'dividend_amount': float,       # Total dividend payments
-    'total_return': float           # Portfolio-level return
-})
-```
-
-## Excel Output Format
-
-When exporting to Excel, the results are organized in three sheets:
-
-1. **Fixed Income CF**: Detailed bond cash flows
-2. **Equity CF**: Detailed equity projections
-3. **Portfolio Summary**: Combined portfolio metrics
-
-Each sheet follows the structure of its corresponding DataFrame as specified above.
-
-## Dependencies
-```txt
-numpy>=1.21.0
-pandas>=1.3.0
-scipy>=1.7.0
-dask>=2021.6.0
-pytest>=6.2.0
-matplotlib>=3.4.0
-seaborn>=0.11.0
-
-```
-
-# Actuarial Stochastic Model Dashboard
-
-A comprehensive actuarial analysis dashboard built with Streamlit, providing tools for GCV calculation, dividend analysis, investment modeling, portfolio management, and scenario analysis.
-
-## Features
-
-### 1. GCV (Gross Cash Value) Analysis
-- Calculate GCV based on face amount, premium, interest rate, expense rate, and mortality rate
-- Visualize GCV progression over time
-- Export detailed GCV calculations
-
-### 2. Dividend Analysis
-- Track dividends across multiple policies
-- Calculate average returns and total dividends
-- Set minimum return thresholds
-- Visualize dividend distribution
-- Monitor recovery metrics
-
-### 3. Investment Analysis
-- Model fixed income and equity investments
-- Configure duration, credit quality, and yield rates
-- Project returns with customizable parameters
-- Analyze risk-return metrics
-
-### 4. Portfolio Management
-- Asset allocation optimization
-- Rebalancing strategy implementation
-- Risk tolerance customization
-- Performance tracking
-- Portfolio metrics calculation (Sharpe ratio, VaR)
-
-### 5. Scenario Analysis
-- Stress testing capabilities
-- Multiple scenario modeling
-- Risk assessment
-- Confidence level adjustments
-
-### 6. Excel Export
-- Comprehensive Excel reports with enhanced formatting
-- Separate sheets for each analysis type
-- Parameter documentation
-- Results visualization
-- Professional formatting with headers and proper number formats
+- Multi-core processor recommended
+- Minimum 16GB RAM
+- SSD storage recommended for large datasets
 
 ## Installation
 
@@ -449,71 +49,141 @@ git clone https://github.com/yourusername/Actuarial_Stochastic_Model.git
 cd Actuarial_Stochastic_Model
 ```
 
-2. Create a virtual environment (recommended):
+2. Create and activate a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+3. Install required packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+## Running the Model
 
-1. Start the dashboard:
+### Dashboard Interface
+Launch the interactive dashboard:
 ```bash
 streamlit run src/dashboard/dashboard.py
 ```
 
-2. Navigate through different analysis sections using the sidebar
-3. Input parameters and analyze results
-4. Export results to Excel using the "Export to Excel" button
-
-## Dependencies
-
-- Python 3.8+
-- streamlit>=1.24.0
-- pandas>=1.5.0
-- numpy>=1.23.0
-- plotly>=5.15.0
-- openpyxl>=3.1.0
-- xlsxwriter>=3.1.9
-- scipy>=1.9.0
-- matplotlib>=3.6.0
-
-## Project Structure
-
+### Command Line Interface
+Run scenario analysis from command line:
+```bash
+python run_model.py --scenarios 1000 --years 30
 ```
-Actuarial_Stochastic_Model/
-├── src/
-│   ├── dashboard/
-│   │   ├── dashboard.py
-│   │   └── tabs.py
-│   ├── investment.py
-│   ├── gcv.py
-│   └── portfolio.py
-├── tests/
-│   ├── test_dashboard.py
-│   ├── test_investment.py
-│   └── test_portfolio.py
-├── requirements.txt
-└── README.md
-```
+
+## Model Components
+
+### Economic Scenario Generator (ESG)
+- Interest rate modeling (Hull-White)
+- Equity returns (Merton jump-diffusion)
+- Credit spreads (Jarrow-Turnbull)
+- Inflation scenarios
+- Asset correlations
+
+### Asset-Liability Model
+1. Asset Components:
+   - Fixed income portfolio
+   - Equity investments
+   - Cash and equivalents
+   - Alternative investments
+
+2. Liability Components:
+   - Policy cash flows
+   - Benefit payments
+   - Premium income
+   - Expenses
+   - Surrenders
+
+3. Integration Features:
+   - Dynamic asset allocation
+   - Cash flow matching
+   - Duration management
+   - Rebalancing strategies
+
+### Risk Analytics
+- VaR and CTE calculations
+- Sensitivity analysis
+- Stress testing
+- Key rate durations
+- Portfolio analytics
+
+## Testing Framework
+
+### Unit Tests
+- Scenario generation validation
+- Cash flow calculation testing
+- Risk metric verification
+- Model consistency checks
+
+### Integration Tests
+- End-to-end model validation
+- Scenario consistency
+- Portfolio rebalancing
+- Risk metric aggregation
+
+## Dashboard Features
+
+### Input Parameters
+1. Economic Scenarios:
+   - Interest rate parameters
+   - Equity market settings
+   - Credit spread configurations
+   - Inflation assumptions
+
+2. Policy Parameters:
+   - Mortality assumptions
+   - Lapse rates
+   - Expense factors
+   - Investment strategy
+
+### Visualizations
+1. Scenario Analysis:
+   - Interest rate paths
+   - Equity returns
+   - Credit spread evolution
+   - Inflation trajectories
+
+2. Cash Flow Analysis:
+   - Premium patterns
+   - Benefit payments
+   - Net cash flows
+   - Present value distributions
+
+3. Risk Metrics:
+   - VaR analysis
+   - CTE calculations
+   - Sensitivity measures
+   - Stress test results
+
+## Documentation
+
+### Model Documentation
+Detailed documentation is available in the `docs` folder:
+- Model methodology
+- Implementation details
+- Validation procedures
+- User guides
+
+### API Documentation
+API documentation is available for all major components:
+- ESG interfaces
+- Model classes
+- Utility functions
+- Risk calculators
 
 ## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Contributions are welcome! Please read our contributing guidelines and code of conduct before submitting pull requests.
 
 ## License
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-This project is licensed under the MIT License.
+## Acknowledgments
+- Financial modeling community
+- Open-source contributors
+- Academic research partners
 
-## Support
-
-For support, please open an issue in the GitHub repository or contact the maintainers.
+## Contact
+For questions and support, please open an issue in the GitHub repository.

@@ -10,6 +10,8 @@ import pandas as pd
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, Tuple, Optional
+
+# Use absolute imports
 from src.dashboard_components import styling
 from src.dashboard_components import gcv_analysis
 from src.dashboard_components import dividend_analysis
@@ -1076,7 +1078,7 @@ class ModelDashboard:
 
             # 2. Dividend Analysis Sheet
             dividend_params = {
-                'Parameters': ['Number of Policies', 'Number of Periods', 'Minimum Return'],
+                'Parameter': ['Number of Policies', 'Number of Periods', 'Minimum Return'],
                 'Value': [
                     st.session_state.get('n_policies', 3),
                     st.session_state.get('n_periods', 20),
@@ -1111,7 +1113,7 @@ class ModelDashboard:
 
             # 3. Investment Analysis Sheet
             investment_params = {
-                'Parameters': [
+                'Parameter': [
                     'Duration (Years)',
                     'Credit Quality',
                     'Yield Rate',
@@ -1145,7 +1147,7 @@ class ModelDashboard:
 
             # 4. Portfolio Analysis Sheet
             portfolio_params = {
-                'Parameters': [
+                'Parameter': [
                     'Fixed Income Allocation',
                     'Equity Allocation',
                     'Rebalancing Frequency',
@@ -1184,7 +1186,7 @@ class ModelDashboard:
 
             # 5. Scenario Analysis Sheet
             scenario_params = {
-                'Parameters': [
+                'Parameter': [
                     'Base Scenario',
                     'Time Horizon',
                     'Confidence Level'
