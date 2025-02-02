@@ -1,14 +1,18 @@
 """
 Interactive dashboard for actuarial model analysis.
 """
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 import streamlit as st
 import plotly.graph_objects as go
-from .dashboard_components import styling
-from .dashboard_components import gcv_analysis
-from .dashboard_components import dividend_analysis
-from .dividend_tracker import DividendTracker
-from .gcv_calculator import GCVCalculator, GradingPattern
-from .visualization import ModelVisualizer
+from src.dashboard_components import styling
+from src.dashboard_components import gcv_analysis
+from src.dashboard_components import dividend_analysis
+from src.dividend_tracker import DividendTracker
+from src.gcv_calculator import GCVCalculator, GradingPattern
+from src.visualization import ModelVisualizer
 
 class ModelDashboard:
     """Interactive dashboard for model analysis."""

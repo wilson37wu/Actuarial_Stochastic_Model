@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 from datetime import date
 from src.economic_scenario import EconomicFactors
+import os
+import datetime
 
 class CashFlow:
     """Represents a single cash flow in the model."""
@@ -243,3 +245,105 @@ class DynamicCashFlowModel:
         )
         
         return metrics
+
+    def export_cash_flows(
+        self,
+        output_dir: str,
+        economic_scenarios: List[List[EconomicFactors]],
+        time_step: str = 'monthly'
+    ) -> str:
+        """
+        Export cash flows to Excel with detailed breakdowns.
+        
+        Args:
+            output_dir: Directory to save the Excel file
+            economic_scenarios: List of economic scenarios for discounting
+            time_step: 'monthly' or 'annual'
+            
+        Returns:
+            str: Path to the created Excel file
+        """
+        # Create timestamp for filename
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = os.path.join(output_dir, f"cash_flows_{time_step}_{timestamp}.xlsx")
+        
+        # Convert cash flows to DataFrame
+        df = pd.DataFrame([
+            {
+                'amount': cf.amount,
+                'time_step': cf.time_step,
+                'flow_type': cf.flow_type,
+                'policy_id': cf.policy_id,
+                'scenario_id': cf.scenario_id,
+                'date': cf.date
+            }
+            for cf in self.cash_flows
+        ])
+        
+        # Group cash flows by type
+        flow_types = {
+            'premium': df[df['flow_type'] == 'premium'],
+            'death_benefit': df[df['flow_type'] == 'death_benefit'],
+            'expense': df[df['flow_type'] == 'expense'],
+            'surrender': df[df['flow_type'] == 'surrender'],
+            'guaranteed_benefit': df[df['flow_type'].str.startswith('guaranteed_')],
+            'non_guaranteed_benefit': df[df['flow_type'].str.startswith('non_guaranteed_')]
+        }
+        
+        # Create Excel writer
+        with pd.ExcelWriter(output_path) as writer:
+            # Undiscounted cash flows
+            time_periods = df['time_step'].unique()
+            for flow_name, flow_data in flow_types.items():
+                pivot = pd.pivot_table(
+                    flow_data,
+                    values='amount',
+                    index='scenario_id',
+                    columns='time_step',
+                    aggfunc='sum',
+                    fill_value=0
+                )
+                
+                if time_step == 'annual' and 'monthly' in str(pivot.columns[0]):
+                    # Convert monthly to annual if needed
+                    pivot = pivot.groupby(pivot.columns // 12, axis=1).sum()
+                
+                pivot.to_excel(writer, sheet_name=f'{flow_name}_flows')
+            
+            # Present value calculations using forward rates
+            for scenario_id, scenario in enumerate(economic_scenarios):
+                # Extract rates for the scenario
+                if time_step == 'annual':
+                    rates = np.array([factor.short_rate for factor in scenario[::12]])  # Take every 12th rate
+                else:
+                    rates = np.array([factor.short_rate for factor in scenario])
+                    rates = (1 + rates) ** (1/12) - 1  # Convert to monthly rates
+                
+                # Calculate discount factors
+                discount_factors = np.cumprod(1 / (1 + rates))
+                
+                for flow_name, flow_data in flow_types.items():
+                    # Filter for current scenario
+                    scenario_flows = flow_data[flow_data['scenario_id'] == scenario_id]
+                    
+                    pivot = pd.pivot_table(
+                        scenario_flows,
+                        values='amount',
+                        columns='time_step',
+                        aggfunc='sum',
+                        fill_value=0
+                    )
+                    
+                    if time_step == 'annual' and 'monthly' in str(pivot.columns[0]):
+                        pivot = pivot.groupby(pivot.columns // 12, axis=1).sum()
+                    
+                    # Apply scenario-specific discount factors
+                    pv_flows = pivot * discount_factors[:pivot.shape[1]]
+                    
+                    # Append to existing sheet or create new one
+                    sheet_name = f'{flow_name}_pv_scenario_{scenario_id}'
+                    if len(sheet_name) > 31:  # Excel sheet name length limit
+                        sheet_name = f'{flow_name[:20]}_pv_s{scenario_id}'
+                    pv_flows.to_excel(writer, sheet_name=sheet_name)
+        
+        return output_path

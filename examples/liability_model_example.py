@@ -14,7 +14,7 @@ import pandas as pd
 import seaborn as sns
 
 from src.actuarial_assumptions import (
-    MortalityTable, LapseAssumption, InflationAssumption
+    MortalityTable, LapseAssumption, InflationAssumption, ActuarialAssumptions
 )
 from src.enums import (
     Sex, UnderwritingClass, SmokingStatus, OccupationClass,
@@ -28,22 +28,27 @@ from src.liability import LiabilityModel
 from src.gcv_calculator import GCVParameters, GradingPattern, ProductVariant
 
 # Set up assumptions
+assumptions = ActuarialAssumptions()  # Initialize with default assumptions
+
 mortality = MortalityTable(
     base_rates={  # Simplified rates
         0: 0.001, 30: 0.002, 50: 0.005, 70: 0.01, 90: 0.1
-    }
+    },
+    assumptions=assumptions
 )
 
 lapse = LapseAssumption(
     base_rates={  # Duration-based rates
         0: 0.15, 1: 0.12, 2: 0.09, 5: 0.06, 10: 0.03
-    }
+    },
+    assumptions=assumptions
 )
 
 inflation = InflationAssumption(
     base_rate=0.02,
     wage_inflation=0.03,
-    medical_inflation=0.05
+    medical_inflation=0.05,
+    assumptions=assumptions
 )
 
 # Generate sample investment returns

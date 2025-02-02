@@ -5,12 +5,51 @@ from datetime import date
 from .fixed_income import FixedIncomeModel, Bond
 from .public_equity import EquityModel, Equity
 
+class AssetPortfolio:
+    """Represents the investment portfolio with strategic asset allocation."""
+    def __init__(self, initial_assets: float, target_allocation: Dict[str, float], accounting_method: str = 'market_value'):
+        """
+        Initialize portfolio with target allocation
+        
+        Args:
+            initial_assets: Initial investment amount
+            target_allocation: Dict with asset class allocations (e.g., {'bond': 0.6, 'equity': 0.4})
+            accounting_method: One of 'book_value', 'amortized_cost', or 'market_value'
+        """
+        self.total_assets = initial_assets
+        self.target_allocation = target_allocation
+        self.accounting_method = accounting_method
+        self.holdings = {
+            'bond': [],
+            'equity': []
+        }
+        self.cash = initial_assets  # Initially all in cash
+        
+    def rebalance(self) -> Dict[str, float]:
+        """
+        Rebalance portfolio to target allocation
+        Returns dict of required trades
+        """
+        current_allocation = self.get_current_allocation()
+        trades = {}
+        
+        for asset_class, target in self.target_allocation.items():
+            current = current_allocation.get(asset_class, 0.0)
+            deviation = (target - current) * self.total_assets
+            trades[asset_class] = deviation
+            
+        return trades
+
 class AssetModel:
     """Asset cash flow model with dynamic linking capabilities to liability model."""
     
     def __init__(self, config: Dict):
         self.config = config
-        self.portfolio = {}
+        self.portfolio = AssetPortfolio(
+            initial_assets=config.get('initial_assets', 0.0),
+            target_allocation=config.get('target_allocation', {'bond': 0.6, 'equity': 0.4}),
+            accounting_method=config.get('accounting_method', 'market_value')
+        )
         self.scenarios = None
         self.fixed_income_model = FixedIncomeModel(config.get('fixed_income', {}))
         self.equity_model = EquityModel(config.get('equity', {}))
@@ -135,6 +174,27 @@ class AssetModel:
         """Calculate key risk metrics for the asset portfolio."""
         # Implementation for risk metrics calculation
         pass
+
+    def reinvest_proceeds(self, amount: float, asset_class: str):
+        """Reinvest proceeds from maturity or sales into specified asset class."""
+        if asset_class == 'bond':
+            # Get current market conditions from scenarios
+            rate = self.scenarios.iloc[-1]['interest_rate']
+            spread = self.scenarios.iloc[-1]['credit_spread']
+            
+            new_bond = self.fixed_income_model.create_bond(
+                principal=amount,
+                coupon_rate=rate + spread,
+                maturity_years=10  # Default to 10-year bonds
+            )
+            self.portfolio.holdings['bond'].append(new_bond)
+            
+        elif asset_class == 'equity':
+            new_equity = self.equity_model.create_equity(
+                amount=amount,
+                sector='market'  # Default to market index
+            )
+            self.portfolio.holdings['equity'].append(new_equity)
 
     def project_portfolio(
         self,

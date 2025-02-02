@@ -1491,6 +1491,12 @@ class ModelDashboard:
         if st.button('Export to Excel'):
             self.export_to_excel()
 
+def main():
+    st.error_container = st.empty()
+
+    def update_error_status(error):
+        st.error_container.error(f"🚨 System Error: {str(error)}")
+
 if __name__ == "__main__":
     st.set_page_config(
         page_title="Actuarial Model Analysis",
@@ -1501,3 +1507,4 @@ if __name__ == "__main__":
     
     dashboard = ModelDashboard()
     dashboard.run_with_export()
+    main()

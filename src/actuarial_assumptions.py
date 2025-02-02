@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 from scipy.interpolate import interp1d
 
 from .enums import (
