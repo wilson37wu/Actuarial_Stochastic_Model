@@ -21,7 +21,7 @@ from .dividend_tracker import DividendTracker
 from .products import (
     BaseInsuranceContract, PolicyValues, PolicyLoan
 )
-from .cash_flow_engine import CashFlowEngine
+from .cash_flow_model import DynamicCashFlowModel
 from .actuarial_calculations import ActuarialCalculations
 
 @dataclass
@@ -169,7 +169,7 @@ class LiabilityModel:
             shareholder_cost_rate=shareholder_cost_rate
         )
         self.contracts: List[BaseInsuranceContract] = []
-        self.cash_flow_engine = CashFlowEngine(
+        self.cash_flow_engine = DynamicCashFlowModel(
             mortality_table.data,
             lapse_assumption.rates,
             pd.Series(expense_factors)

@@ -1,5 +1,14 @@
 """
-Example script demonstrating the liability model with various product features.
+Example script demonstrating the liability model with vectorized operations.
+
+This example shows how to:
+1. Set up a LiabilityModel with vectorized operations
+2. Generate and project multiple scenarios efficiently
+3. Analyze cash flows using pandas operations
+4. Visualize results using matplotlib
+
+The example uses vectorized operations for improved performance when dealing with
+large policy datasets and multiple scenarios.
 """
 import sys
 from pathlib import Path
@@ -30,10 +39,16 @@ from src.gcv_calculator import GCVParameters, GradingPattern, ProductVariant
 # Set up assumptions
 assumptions = ActuarialAssumptions()  # Initialize with default assumptions
 
+# Create sample mortality table with vectorized operations
+mortality_data = pd.DataFrame({
+    'age': range(20, 100),
+    'sex': 'M',
+    'smoker_status': 'N',
+    'mortality_rate': [0.001 * (1.05 ** (age - 20)) for age in range(20, 100)]
+})
+
 mortality = MortalityTable(
-    base_rates={  # Simplified rates
-        0: 0.001, 30: 0.002, 50: 0.005, 70: 0.01, 90: 0.1
-    },
+    base_rates=mortality_data.set_index('age')['mortality_rate'].to_dict(),
     assumptions=assumptions
 )
 
@@ -74,6 +89,17 @@ def generate_investment_returns(start_date: date,
     
     return dict(zip(dates, returns))
 
+# Create sample policy data using pandas operations
+policy_data = pd.DataFrame({
+    'policy_id': range(1000),
+    'face_amount': np.random.uniform(50000, 500000, 1000),
+    'premium': np.random.uniform(1000, 5000, 1000),
+    'account_value': np.random.uniform(10000, 100000, 1000),
+    'date_of_birth': pd.date_range(start='1960-01-01', periods=1000, freq='D'),
+    'sex': np.random.choice(['M', 'F'], 1000),
+    'smoker_status': np.random.choice(['Y', 'N'], 1000)
+})
+
 # Create sample contracts
 valuation_date = date(2024, 1, 1)
 investment_returns = generate_investment_returns(
@@ -81,106 +107,22 @@ investment_returns = generate_investment_returns(
     years=10
 )
 
-# Term Insurance
-term = TermInsurance(
-    policy_number="T001",
-    issue_date=valuation_date,
-    term_length=20,
-    premium=1000,
-    face_amount=100000,
-    issue_age=35,
-    sex=Sex.MALE,
-    smoking_status=SmokingStatus.NON_SMOKER,
-    occupation_class=OccupationClass.PROFESSIONAL,
-    underwriting_class=UnderwritingClass.PREFERRED,
-    premium_mode=PremiumMode.ANNUAL
-)
-
-# Whole Life with Premium Flexibility
-whole_life = WholeLifeInsurance(
-    policy_number="WL001",
-    issue_date=valuation_date,
-    term_length=95,  # To age 95
-    premium=2000,
-    face_amount=200000,
-    issue_age=40,
-    sex=Sex.FEMALE,
-    smoking_status=SmokingStatus.NON_SMOKER,
-    occupation_class=OccupationClass.PROFESSIONAL,
-    underwriting_class=UnderwritingClass.STANDARD,
-    premium_mode=PremiumMode.MONTHLY,
-    guaranteed_rate=0.03,
-    premium_holiday_available=True,
-    max_premium_holiday=24  # 2 years
-)
-
-# Participating Whole Life with Dividends
-par_whole_life = ParticipatingWholeLife(
-    policy_number="PWL001",
-    issue_date=valuation_date,
-    term_length=95,
-    premium=3000,
-    face_amount=300000,
-    issue_age=45,
-    sex=Sex.MALE,
-    smoking_status=SmokingStatus.SMOKER,
-    occupation_class=OccupationClass.TECHNICAL,
-    underwriting_class=UnderwritingClass.STANDARD,
-    guaranteed_rate=0.03,
-    dividend_option=DividendOption.PAID_UP_ADDITIONS,
-    dividend_scale=0.8,
-    nonforfeiture_option=NonForfeitureOption.REDUCED_PAID_UP
-)
-
-# Universal Life with Flexible Premium
-ul = UniversalLife(
-    policy_number="UL001",
-    issue_date=valuation_date,
-    term_length=95,
-    premium=1500,
-    initial_face_amount=150000,
-    issue_age=30,
-    sex=Sex.FEMALE,
-    smoking_status=SmokingStatus.NON_SMOKER,
-    occupation_class=OccupationClass.PROFESSIONAL,
-    underwriting_class=UnderwritingClass.PREFERRED,
-    min_guaranteed_rate=0.02,
-    current_credited_rate=0.04,
-    cost_of_insurance={  # Simplified COI rates
-        30: 0.001, 40: 0.002, 50: 0.004, 60: 0.008
-    },
-    min_premium=500,
-    max_premium=5000,
-    premium_mode=PremiumMode.MONTHLY  
-)
-
-# Unit-Linked with Target Date Strategy
-unit_linked = UnitLinkedInsurance(
-    policy_number="UL002",
-    issue_date=valuation_date,
-    term_length=95,
-    premium=2000,
-    initial_face_amount=200000,
-    issue_age=35,
-    sex=Sex.MALE,
-    smoking_status=SmokingStatus.NON_SMOKER,
-    occupation_class=OccupationClass.PROFESSIONAL,
-    underwriting_class=UnderwritingClass.PREFERRED,
-    investment_strategy="TARGET_2045",
-    fund_allocation={
-        "LARGE_CAP_EQUITY": 0.4,
-        "INTERNATIONAL_EQUITY": 0.3,
-        "CORPORATE_BOND": 0.2,
-        "MONEY_MARKET": 0.1
-    },
-    fund_charges={
-        "LARGE_CAP_EQUITY": 0.005,
-        "INTERNATIONAL_EQUITY": 0.007,
-        "CORPORATE_BOND": 0.004,
-        "MONEY_MARKET": 0.002
-    },
-    premium_mode=PremiumMode.MONTHLY  
-)
+contracts = []
+for index, row in policy_data.iterrows():
+    contract = TermInsurance(
+        policy_number=f"T{index}",
+        issue_date=valuation_date,
+        term_length=20,
+        premium=row['premium'],
+        face_amount=row['face_amount'],
+        issue_age=(valuation_date - row['date_of_birth']).days // 365,
+        sex=Sex.MALE if row['sex'] == 'M' else Sex.FEMALE,
+        smoking_status=SmokingStatus.NON_SMOKER if row['smoker_status'] == 'N' else SmokingStatus.SMOKER,
+        occupation_class=OccupationClass.PROFESSIONAL,
+        underwriting_class=UnderwritingClass.PREFERRED,
+        premium_mode=PremiumMode.ANNUAL
+    )
+    contracts.append(contract)
 
 # Create sample GCV parameters for different product variants
 standard_gcv_params = GCVParameters(
@@ -262,11 +204,8 @@ model = LiabilityModel(
 )
 
 # Add contracts
-model.add_contract(term)
-model.add_contract(whole_life)
-model.add_contract(par_whole_life)
-model.add_contract(ul)
-model.add_contract(unit_linked)
+for contract in contracts:
+    model.add_contract(contract)
 model.add_contract(standard_wl)
 model.add_contract(high_early_wl)
 model.add_contract(level_wl)

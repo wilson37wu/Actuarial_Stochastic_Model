@@ -1,10 +1,22 @@
 """
-Dynamic cash flow modeling for assets and liabilities.
+Dynamic cash flow modeling for assets and liabilities with vectorized operations.
+
+This module provides a comprehensive framework for modeling insurance cash flows using
+vectorized operations for improved performance. It supports:
+
+- Dynamic scenario modeling for both assets and liabilities
+- Vectorized calculations using pandas operations
+- Multiple economic scenarios analysis
+- Risk metric calculations
+- Integration with asset-liability management (ALM)
+
+The main class DynamicCashFlowModel handles all cash flow projections and can be
+used in conjunction with other modules for full ALM analysis.
 """
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 from datetime import date
 from src.economic_scenario import EconomicFactors
 from .actuarial_calculations import ActuarialCalculations
@@ -12,7 +24,17 @@ import os
 import datetime
 
 class CashFlow:
-    """Represents a single cash flow in the model."""
+    """
+    Represents a single cash flow in the model.
+    
+    Attributes:
+        amount (float): The monetary amount of the cash flow
+        time_step (int): The time step at which the cash flow occurs
+        flow_type (str): Type of cash flow (e.g., 'death_benefit', 'surrender_benefit', 'premium')
+        policy_id (int): Identifier for the associated policy
+        scenario_id (int): Identifier for the economic scenario (default: 0)
+        date (date): The date of the cash flow (default: today)
+    """
     def __init__(
             self,
             amount: float,
@@ -30,57 +52,110 @@ class CashFlow:
         self.date = date
 
 class DynamicCashFlowModel:
-    """Models dynamic cash flows for assets and liabilities."""
+    """
+    Models dynamic cash flows for assets and liabilities using vectorized operations.
     
+    This class provides high-performance cash flow modeling capabilities using pandas
+    vectorized operations. It supports:
+    
+    - Multiple economic scenarios
+    - Asset and liability cash flow projections
+    - Risk metric calculations
+    - Integration with investment strategies
+    
+    The model uses vectorized operations for improved performance while maintaining
+    the flexibility to handle complex insurance product features.
+    
+    Args:
+        initial_assets (float): Initial asset value
+        mortality_table (pd.DataFrame): Mortality rates by age, sex, and other factors
+        lapse_rates (Union[Dict[int, float], pd.Series]): Lapse rates by duration
+        expense_factors (Union[Dict[str, float], pd.Series]): Expense factors by type
+        investment_strategy (Dict[str, float]): Asset allocation strategy
+    """
     def __init__(self, 
                  initial_assets: float,
                  mortality_table: pd.DataFrame,
-                 lapse_rates: Dict[int, float],
-                 expense_factors: Dict[str, float],
+                 lapse_rates: Union[Dict[int, float], pd.Series],
+                 expense_factors: Union[Dict[str, float], pd.Series],
                  investment_strategy: Dict[str, float]):
         """Initialize the cash flow model."""
         self.initial_assets = initial_assets
         self.mortality_table = mortality_table
-        self.lapse_rates = lapse_rates
-        self.expense_factors = expense_factors
+        self.lapse_rates = pd.Series(lapse_rates) if isinstance(lapse_rates, dict) else lapse_rates
+        self.expense_factors = pd.Series(expense_factors) if isinstance(expense_factors, dict) else expense_factors
         self.investment_strategy = investment_strategy
         self.cash_flows: List[CashFlow] = []
         
+    def _calculate_mortality_flows(self, policies: pd.DataFrame, valuation_date: date) -> pd.Series:
+        """Vectorized mortality calculation using pandas operations."""
+        # Calculate attained ages
+        attained_ages = (valuation_date - pd.to_datetime(policies['date_of_birth'])).dt.days // 365
+        
+        # Merge with mortality rates
+        merged = policies.merge(
+            self.mortality_table,
+            left_on=['sex', 'smoker_status', attained_ages],
+            right_on=['sex', 'smoker_status', 'age'],
+            how='left'
+        )
+        
+        return merged['face_amount'] * merged['mortality_rate']
+
+    def _calculate_lapse_flows(self, policies: pd.DataFrame, duration: int) -> pd.Series:
+        """Calculate lapse benefits using vectorized operations."""
+        lapse_rate = self.lapse_rates.loc[duration]
+        return policies['account_value'] * 0.9 * lapse_rate  # 90% of account value
+
+    def _calculate_expenses(self, policies: pd.DataFrame, time_step: str) -> pd.Series:
+        """Calculate expenses using vectorized operations."""
+        expense_rate = self.expense_factors[time_step]
+        return policies['premium'] * expense_rate
+
     def project_liability_flows(
         self,
         economic_scenarios: List[List[EconomicFactors]],
         policy_data: pd.DataFrame
     ) -> List[CashFlow]:
-        """Project liability cash flows for all scenarios."""
+        """Project liability cash flows for all scenarios using vectorized operations."""
         liability_flows = []
         
         for scenario_idx, scenario in enumerate(economic_scenarios):
-            # Get mortality rates for each policy based on age
-            mortality_rates = [
-                ActuarialCalculations.calculate_mortality_rates(
-                    row['age'], 
-                    row['sex'], 
-                    self.mortality_table
-                )
-                for _, row in policy_data.iterrows()
-            ]
-            
             for time_idx, factors in enumerate(scenario):
-                # Calculate benefits
-                death_benefits = self._calculate_death_benefits(
-                    policy_data, mortality_rates, time_idx)
-                surrender_benefits = self._calculate_surrender_benefits(
-                    policy_data, time_idx)
+                # Calculate benefits using vectorized operations
+                death_flows = self._calculate_mortality_flows(policy_data, factors.date)
+                surrender_flows = self._calculate_lapse_flows(policy_data, time_idx)
+                expense_flows = self._calculate_expenses(policy_data, f"t{time_idx}")
                 
-                # Project premiums
-                premium_flows = self._calculate_premium_flows(
-                    policy_data, time_idx)
-                
-                # Add flows to results
-                for flow in death_benefits + surrender_benefits + premium_flows:
-                    flow.scenario_id = scenario_idx
-                    flow.date = factors.date
-                    liability_flows.append(flow)
+                # Convert to CashFlow objects
+                for policy_id, (death, surrender, expense) in enumerate(
+                    zip(death_flows, surrender_flows, expense_flows)):
+                    
+                    if death > 0:
+                        liability_flows.append(CashFlow(
+                            death, time_idx, 'death_benefit', policy_id,
+                            scenario_idx, factors.date
+                        ))
+                    
+                    if surrender > 0:
+                        liability_flows.append(CashFlow(
+                            surrender, time_idx, 'surrender_benefit', policy_id,
+                            scenario_idx, factors.date
+                        ))
+                    
+                    if expense > 0:
+                        liability_flows.append(CashFlow(
+                            -expense, time_idx, 'expense', policy_id,
+                            scenario_idx, factors.date
+                        ))
+                    
+                    # Add premium inflow
+                    if policy_data.iloc[policy_id]['premium'] > 0:
+                        liability_flows.append(CashFlow(
+                            policy_data.iloc[policy_id]['premium'],
+                            time_idx, 'premium', policy_id,
+                            scenario_idx, factors.date
+                        ))
         
         return liability_flows
     
@@ -103,7 +178,7 @@ class DynamicCashFlowModel:
                 fixed_income_return = factors.short_rate + factors.credit_spread
                 equity_return = factors.equity_return
                 
-                # Apply investment strategy
+                # Apply investment strategy using vectorized operations
                 fixed_income_assets = assets * self.investment_strategy.get('fixed_income', 0.7)
                 equity_assets = assets * self.investment_strategy.get('equity', 0.3)
                 
@@ -128,88 +203,6 @@ class DynamicCashFlowModel:
                 assets = assets + fixed_income_income + equity_income + period_liability_flows
                 
         return asset_flows
-    
-    def _calculate_death_benefits(
-        self,
-        policy_data: pd.DataFrame,
-        mortality_rates: List[float],
-        time_step: int
-    ) -> List[CashFlow]:
-        """Calculate death benefits for the current time step."""
-        death_benefits = []
-        
-        # Generate random death probabilities for each policy
-        for policy_id, (policy, mortality_rate) in enumerate(zip(policy_data.iterrows(), mortality_rates)):
-            # Assume Uniform Distribution of Deaths (UDD)
-            q_x = mortality_rate  # Annual mortality rate
-            t = 1/12  # Assuming monthly time steps
-            death_prob = 1 - (1 - q_x) ** t  # Convert annual to monthly probability
-            
-            # Apply product-specific factors (example: multiplier for term life)
-            product_factor = policy[1].get('mortality_factor', 1.0)
-            death_prob *= product_factor
-            
-            if np.random.random() < death_prob:
-                benefit = CashFlow(
-                    policy[1]['face_amount'],
-                    time_step,
-                    'death_benefit',
-                    policy[0],
-                    0,
-                    date.today()
-                )
-                death_benefits.append(benefit)
-        
-        return death_benefits
-    
-    def _calculate_surrender_benefits(
-        self,
-        policy_data: pd.DataFrame,
-        time_step: int
-    ) -> List[CashFlow]:
-        """Calculate surrender benefits for the current time step."""
-        surrender_benefits = []
-        
-        # Get lapse rate for current time step
-        lapse_rate = self.lapse_rates.get(time_step, 0.05)  # Default to 5% if not specified
-        
-        for policy_id, policy in policy_data.iterrows():
-            if np.random.random() < lapse_rate:
-                surrender_value = policy['account_value'] * 0.9  # 90% of account value
-                benefit = CashFlow(
-                    surrender_value,
-                    time_step,
-                    'surrender_benefit',
-                    policy_id,
-                    0,
-                    date.today()
-                )
-                surrender_benefits.append(benefit)
-        
-        return surrender_benefits
-    
-    def _calculate_premium_flows(
-        self,
-        policy_data: pd.DataFrame,
-        time_step: int
-    ) -> List[CashFlow]:
-        """Calculate premium inflows for the current time step."""
-        premium_flows = []
-        
-        for policy_id, policy in policy_data.iterrows():
-            # Assume monthly premium payments
-            if time_step % 12 == 0:  # Premium due at start of each year
-                premium = CashFlow(
-                    policy['premium'],
-                    time_step,
-                    'premium',
-                    policy_id,
-                    0,
-                    date.today()
-                )
-                premium_flows.append(premium)
-        
-        return premium_flows
     
     def calculate_risk_metrics(self,
                              liability_flows: List[CashFlow],
