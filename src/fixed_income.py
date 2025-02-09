@@ -16,7 +16,32 @@ class Bond:
     issue_date: date
     purchase_price: float
     currency: str = 'USD'
+    projection_start: date = None  # NEW: projection start date
     
+    def __post_init__(self):
+        """Initialize additional attributes after dataclass creation."""
+        if self.projection_start is None:
+            self.projection_start = date.today()
+        self.payment_dates = self._generate_payment_dates()
+    
+    def _generate_payment_dates(self) -> pd.DatetimeIndex:
+        """Generate payment dates based on projection start and frequency."""
+        freq_map = {
+            1: 'Y',   # annual
+            2: '6M',  # semi-annual
+            4: '3M',  # quarterly
+            12: 'M'   # monthly
+        }
+        
+        if self.payment_frequency not in freq_map:
+            raise ValueError(f"Unsupported payment frequency: {self.payment_frequency}")
+            
+        return pd.date_range(
+            start=self.projection_start,
+            end=self.maturity_date,
+            freq=freq_map[self.payment_frequency]
+        )
+
 class FixedIncomeModel:
     """Fixed Income cash flow projection model."""
     

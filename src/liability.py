@@ -21,6 +21,8 @@ from .dividend_tracker import DividendTracker
 from .products import (
     BaseInsuranceContract, PolicyValues, PolicyLoan
 )
+from .cash_flow_engine import CashFlowEngine
+from .actuarial_calculations import ActuarialCalculations
 
 @dataclass
 class CashFlowProjection:
@@ -151,7 +153,7 @@ class LiabilityModel:
     def __init__(self,
                  mortality_table: MortalityTable,
                  lapse_assumption: LapseAssumption,
-                 inflation_assumption: InflationAssumption,
+                 expense_factors: Dict[str, float],
                  investment_returns: Optional[Dict[date, float]] = None,
                  gcv_factors: Optional[GCVFactors] = None,
                  minimum_dividend_rate: float = 0.01,
@@ -159,7 +161,7 @@ class LiabilityModel:
         """Initialize liability model."""
         self.mortality_table = mortality_table
         self.lapse_assumption = lapse_assumption
-        self.inflation_assumption = inflation_assumption
+        self.expense_factors = expense_factors
         self.investment_returns = investment_returns or {}
         self.gcv_calculator = GCVCalculator(external_factors=gcv_factors)
         self.dividend_tracker = DividendTracker(
@@ -167,6 +169,11 @@ class LiabilityModel:
             shareholder_cost_rate=shareholder_cost_rate
         )
         self.contracts: List[BaseInsuranceContract] = []
+        self.cash_flow_engine = CashFlowEngine(
+            mortality_table.data,
+            lapse_assumption.rates,
+            pd.Series(expense_factors)
+        )
     
     def add_contract(self, contract: BaseInsuranceContract):
         """Add contract to model."""
@@ -275,189 +282,50 @@ class LiabilityModel:
             if not contract.is_active(valuation_date):
                 return cf
             
-            # Track policy state
-            remaining_if = 1.0  # Track remaining in-force
-            current_values = PolicyValues(
-                cash_value=0.0,
-                surrender_value=0.0,
-                death_benefit=contract.face_amount,
-                loan_balance=0.0
+            # Mortality calculation
+            mortality_rate = ActuarialCalculations.calculate_mortality_rates(
+                age=contract.current_age,
+                sex=contract.sex,
+                mortality_table=self.mortality_table
+            )
+
+            # Lapse calculation
+            lapse_rate = ActuarialCalculations.calculate_lapse_rates(
+                duration=contract.duration,
+                product_type=contract.product_type,
+                lapse_assumptions=self.lapse_assumption
+            )
+
+            # Expense calculation
+            expense = ActuarialCalculations.calculate_expenses(
+                annual_premium=contract.premium,
+                policy_duration=contract.duration,
+                expense_factors=self.expense_factors
             )
             
-            for t, proj_date in enumerate(time_points):
-                if remaining_if <= 0.001:  # Stop if less than 0.1% remaining in-force
-                    break
-                
-                try:
-                    # Get current rates
-                    duration = contract.get_policy_duration(proj_date)
-                    attained_age = contract.get_attained_age(proj_date)
-                    
-                    qx = self.mortality_table.get_rate(
-                        age=attained_age,
-                        sex=contract.sex,
-                        smoking_status=contract.smoking_status
-                    )
-                    
-                    wx = self.lapse_assumption.get_rate(
-                        duration=duration,
-                        product_type=contract.product_type
-                    )
-                    
-                    # Calculate premium (deterministic)
-                    if contract.premium_mode == PremiumMode.FLEXIBLE:
-                        premium = min(
-                            contract.max_premium or float('inf'),
-                            max(
-                                contract.min_premium or 0.0,
-                                contract.get_modal_premium()
-                            )
-                        )
-                    else:
-                        premium = contract.get_modal_premium()
-                    
-                    # Handle premium payment status
-                    if len(contract.premium_history) > 0:
-                        last_payment = contract.premium_history[-1]
-                        if last_payment.status == PremiumStatus.PREMIUM_HOLIDAY:
-                            premium = 0.0
-                        elif (last_payment.status == PremiumStatus.AUTOMATIC_PREMIUM_LOAN and
-                              contract.nonforfeiture_option == NonForfeitureOption.AUTOMATIC_PREMIUM_LOAN):
-                            if current_values.cash_value >= premium:
-                                contract.loans.append(
-                                    PolicyLoan(
-                                        amount=premium,
-                                        start_date=proj_date,
-                                        interest_rate=0.08,  # Example rate
-                                        purpose="PREMIUM"
-                                    )
-                                )
-                                cf['policy_loans'][t] += premium * remaining_if
-                            else:
-                                cf['surrenders'][t] += current_values.surrender_value * remaining_if
-                                remaining_if = 0
-                                break
-                    
-                    # Update cash values based on product type
-                    if contract.product_type == ProductType.UNIVERSAL_LIFE:
-                        # UL account value mechanics (deterministic credited rate)
-                        coi = contract.cost_of_insurance[attained_age]
-                        credited_rate = max(
-                            contract.min_guaranteed_rate,
-                            contract.current_credited_rate
-                        )
-                        
-                        current_values.cash_value = (
-                            current_values.cash_value * (1 + credited_rate / 12) +
-                            premium - 
-                            coi * contract.face_amount / 1000
-                        )
-                        
-                        current_values.death_benefit = contract.calculate_death_benefit()
-                        
-                    elif contract.product_type == ProductType.UNIT_LINKED:
-                        # Unit-linked value mechanics (stochastic investment returns)
-                        contract.update_allocation(proj_date)
-                        investment_return = self.investment_returns.get(
-                            proj_date,
-                            0.05  # Default return
-                        )
-                        
-                        # Update unit values stochastically
-                        for fund, units in contract.unit_holdings.items():
-                            nav = contract.nav_history.get((proj_date, fund), 1.0)
-                            current_values.unit_value += units * nav * (
-                                1 + investment_return - 
-                                contract.fund_charges[fund]
-                            )
-                        
-                        current_values.cash_value = current_values.unit_value
-                        current_values.death_benefit = max(
-                            contract.face_amount,
-                            current_values.unit_value
-                        )
-                        
-                    elif contract.product_type == ProductType.PAR_WHOLE_LIFE:
-                        # Participating policy mechanics (stochastic investment returns)
-                        investment_return = self.investment_returns.get(
-                            proj_date,
-                            0.05  # Default return
-                        )
-                        
-                        # Calculate asset share and dividend (stochastic)
-                        asset_share = contract.calculate_asset_share(
-                            duration=duration,
-                            mortality_rate=qx,
-                            expense_rate=0.05,  # Example expense rate
-                            investment_return=investment_return
-                        )
-                        
-                        # Calculate Guaranteed Cash Value
-                        policy_year = duration // 12
-                        gcv = self.gcv_calculator.calculate_gcv(
-                            sex='M' if contract.sex == Sex.MALE else 'F',
-                            policy_year=policy_year,
-                            premium=contract.get_annual_premium(),
-                            face_amount=contract.face_amount,
-                            pv_premium=contract.get_premium_pv()
-                        )
-                        
-                        # Update cash and surrender values
-                        current_values.cash_value = max(gcv, asset_share)
-                        current_values.surrender_value = gcv  # Use GCV as surrender value
-                        
-                        # Calculate non-guaranteed cash dividend
-                        cash_dividend = self.dividend_tracker.calculate_dividend(
-                            policy_number=contract.policy_number,
-                            asset_return=investment_return,
-                            face_amount=contract.face_amount,
-                            valuation_date=proj_date
-                        )
-                        
-                        # Record cash dividend separately from other dividends
-                        cf['cash_dividends'][t] += cash_dividend * remaining_if
-                        
-                        if duration > 0 and duration % 12 == 0:  # Annual dividend
-                            # Calculate other dividends (e.g., experience refund)
-                            experience_dividend = max(0, asset_share - gcv) * contract.dividend_scale
-                            cf['experience_dividends'][t] += experience_dividend * remaining_if
-                            
-                            if contract.dividend_option == DividendOption.CASH:
-                                current_values.dividend_balance += experience_dividend
-                            elif contract.dividend_option == DividendOption.PREMIUM:
-                                cf['premiums'][t] += experience_dividend * remaining_if
-                            elif contract.dividend_option == DividendOption.ADDITIONS:
-                                contract.face_amount += experience_dividend
-                    
-                    # Calculate decrements (deterministic mortality, potentially stochastic lapse)
-                    prob_death = qx * (1 - wx/2)  # Independent decrements
-                    prob_lapse = wx * (1 - qx/2)
-                    
-                    # Apply decrements to in-force (deterministic for mortality)
-                    death_decrement = remaining_if * prob_death
-                    lapse_decrement = remaining_if * prob_lapse
-                    
-                    # Record cash flows
-                    cf['death_benefits'][t] += current_values.death_benefit * death_decrement
-                    cf['surrenders'][t] += current_values.surrender_value * lapse_decrement
-                    cf['premiums'][t] += premium * remaining_if
-                    cf['expenses'][t] += premium * 0.05 * remaining_if  # Example expense rate
-                    
-                    # Update remaining in-force
-                    remaining_if *= (1 - prob_death - prob_lapse)
-                    
-                    # Handle loan interest
-                    for loan in contract.loans:
-                        loan.accrue_interest(
-                            (time_points[t] - time_points[t-1]).days / 365
-                        )
-                        cf['loan_repayments'][t] += (
-                            loan.get_payment_amount() * remaining_if
-                        )
-                
-                except Exception as e:
-                    print(f"Error processing contract: {e}")
-                    return cf
+            # Convert contract data to DataFrame
+            policy_df = pd.DataFrame([contract.__dict__])
+            
+            # Get economic factors for projection period
+            economic_factors = self._get_economic_factors(time_points)
+            
+            # Calculate all flows in one call
+            projections = self.cash_flow_engine.project_cashflows(
+                policy_df, 
+                economic_factors
+            )
+            
+            # Update cash flows
+            cf['premiums'] = projections['premiums']
+            cf['death_benefits'] = projections['death_benefits']
+            cf['surrenders'] = projections['surrenders']
+            cf['expenses'] = projections['expenses']
+            cf['dividends'] = projections['dividends']
+            cf['policy_loans'] = projections['policy_loans']
+            cf['loan_repayments'] = projections['loan_repayments']
+            cf['withdrawals'] = projections['withdrawals']
+            cf['cash_dividends'] = projections['cash_dividends']
+            cf['experience_dividends'] = projections['experience_dividends']
             
             return cf
         

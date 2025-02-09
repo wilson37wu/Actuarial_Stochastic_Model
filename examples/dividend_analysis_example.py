@@ -41,9 +41,10 @@ def main():
     
     # 1. Visualize GCV Patterns
     visualizer.plot_gcv_patterns(
-        calculator=calculator,
         max_years=30,
-        save_path='outputs/gcv_patterns.png'
+        premium=5000,
+        face_amount=100000,
+        cash_value=80000
     )
     
     # 2. Visualize Product Variants

@@ -1,0 +1,15 @@
+{
+  "strategies": {
+    "dynamic_reinvestment": {
+      "target_allocation": {
+        "bond": 0.55,
+        "equity": 0.45
+      },
+      "reinvestment_rules": {
+        "cash_threshold": 0.05,
+        "priority_order": ["bond", "equity"],
+        "minimum_trade_size": 1000
+      }
+    }
+  }
+}

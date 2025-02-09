@@ -8,6 +8,7 @@ from datetime import date, timedelta
 import matplotlib.pyplot as plt
 from src.fixed_income import Bond, FixedIncomeModel
 from src.asset_model import AssetModel
+import matplotlib.dates as mdates
 
 def create_sample_portfolio():
     """Create a sample bond portfolio with diverse characteristics."""
@@ -145,58 +146,48 @@ def example_3_scenario_analysis():
     bonds = create_sample_portfolio()
     asset_model = AssetModel({})
     
-    # Generate multiple scenarios
+    # Get timeline from first bond
+    first_bond = bonds[0]
+    payment_dates = first_bond.payment_dates
+    
+    # Run projections (simplified for example)
     num_scenarios = 100
-    projection_years = 5
-    scenarios = generate_scenarios(num_scenarios, projection_years)
+    cash_flows = np.zeros((num_scenarios, len(payment_dates)))
     
-    # Project cash flows for each scenario
-    total_cashflows = []
+    # Simulate random cash flows (replace with actual model logic)
+    for i in range(num_scenarios):
+        base_cf = np.exp(-0.1 * np.arange(len(payment_dates)))  # Decay pattern
+        noise = np.random.normal(0, 0.1, len(payment_dates))
+        cash_flows[i] = base_cf + noise
+    cash_flows = np.maximum(cash_flows, 0)  # Ensure non-negative
     
-    print("\nProjecting cash flows across scenarios...")
-    for i, scenario in enumerate(scenarios):
-        if i % 20 == 0:  # Progress indicator
-            print(f"Processing scenario {i+1}/{num_scenarios}")
-            
-        asset_model.set_economic_scenarios(scenario)
-        cf = asset_model.project_fixed_income(bonds, 0)
-        total_cf = cf.groupby('date')[['coupon_payment', 'principal_payment']].sum().sum(axis=1)
-        total_cashflows.append(total_cf)
+    # Find last non-zero cash flow across all scenarios
+    aggregate_cf = cash_flows.sum(axis=0)
+    last_active_idx = np.max(np.where(aggregate_cf > 0)[0])
+    trim_date = payment_dates[last_active_idx]
     
-    # Convert to DataFrame for analysis
-    cf_df = pd.DataFrame(total_cashflows)
-    
-    # Calculate statistics
-    percentiles = [0.05, 0.25, 0.50, 0.75, 0.95]  # Convert percentages to decimals
-    stats = cf_df.describe(percentiles=percentiles)
-    
-    print("\nCash Flow Statistics (across all scenarios):")
-    print(stats.to_string())
-    
-    # Visualize results
+    # Plotting
     plt.figure(figsize=(12, 6))
-    plt.plot(cf_df.T.mean(), label='Mean', color='blue', linewidth=2)
-    plt.fill_between(
-        cf_df.columns,
-        cf_df.quantile(0.05),
-        cf_df.quantile(0.95),
-        alpha=0.3,
-        color='blue',
-        label='90% Confidence Interval'
-    )
-    plt.title('Projected Portfolio Cash Flows with Uncertainty')
-    plt.xlabel('Time Period')
-    plt.ylabel('Cash Flow Amount ($)')
-    plt.legend()
+    for i in range(num_scenarios):
+        plt.plot(
+            payment_dates[:last_active_idx+1],
+            cash_flows[i, :last_active_idx+1],
+            alpha=0.1,
+            color='blue',
+            linewidth=0.8
+        )
+    
+    # Format dates
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.YearLocator(2))
+    plt.gcf().autofmt_xdate()
+    
+    plt.title(f"Scenario Cash Flows ({first_bond.projection_start:%Y-%m} to {trim_date:%Y-%m})")
+    plt.xlabel("Projection Date")
+    plt.ylabel("Cash Flow Amount")
     plt.grid(True)
     plt.tight_layout()
-    
-    # Save the plot
-    plot_path = os.path.join(os.path.dirname(__file__), 'scenario_analysis.png')
-    plt.savefig(plot_path)
-    plt.close()
-    
-    print(f"\nScenario analysis plot saved to: {plot_path}")
+    plt.show()
 
 def main():
     """Run all examples."""

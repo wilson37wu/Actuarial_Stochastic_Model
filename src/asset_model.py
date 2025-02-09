@@ -159,9 +159,34 @@ class AssetModel:
         return pd.concat(all_cashflows, ignore_index=True)
         
     def calculate_reinvestment(self, available_cash: float, projection_date: pd.Timestamp,
-                             scenario_idx: int) -> Dict:
-        """Calculate reinvestment strategy based on available cash."""
-        # Implementation for reinvestment logic
+                              scenario_idx: int):
+        """Execute reinvestment based on strategic allocation rules"""
+        if available_cash < self.config['reinvestment_rules']['minimum_trade_size']:
+            return {}
+            
+        target_alloc = self.get_current_allocation(scenario_idx)
+        current_alloc = self.portfolio.current_allocation()
+        
+        # Calculate required trades to maintain target allocation
+        trades = {}
+        for asset_class in target_alloc:
+            target_amount = self.portfolio.total_assets * target_alloc[asset_class]
+            current_amount = current_alloc.get(asset_class, 0)
+            
+            if target_amount - current_amount > 0:
+                trades[asset_class] = min(
+                    available_cash * target_alloc[asset_class],
+                    target_amount - current_amount
+                )
+                
+        # Execute trades using market prices from scenario
+        self._execute_trades(trades, scenario_idx)
+        return trades
+        
+    def _execute_trades(self, trades: dict, scenario_idx: int):
+        """Execute trades using current market prices"""
+        # Implementation would interact with market data
+        # from economic scenarios
         pass
         
     def rebalance_portfolio(self, current_allocation: Dict, target_allocation: Dict,
@@ -196,6 +221,11 @@ class AssetModel:
             )
             self.portfolio.holdings['equity'].append(new_equity)
 
+    def project_asset_cf(self, bond_alloc: float, equity_alloc: float, strategy: str) -> pd.Series:
+        """Project asset cash flows with given allocation and strategy"""
+        self.portfolio.target_allocation = {'bond': bond_alloc, 'equity': equity_alloc}
+        return self._project_with_strategy(strategy)
+
     def project_portfolio(
         self,
         bonds: List[Bond],
@@ -227,7 +257,7 @@ class AssetModel:
             raise ValueError("Economic scenarios must be set before projection")
             
         # Create projection dates
-        freq = 'M' if frequency == 'monthly' else 'A'
+        freq = 'ME' if frequency == 'monthly' else 'A'
         periods = projection_years * (12 if frequency == 'monthly' else 1)
         
         projection_dates = pd.date_range(

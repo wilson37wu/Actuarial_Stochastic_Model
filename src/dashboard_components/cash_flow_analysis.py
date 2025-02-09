@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from typing import List, Dict
 from datetime import date
-from cash_flow_model import CashFlow
+from src.cash_flow_model import CashFlow
 
 def plot_cash_flows(cash_flows: List[CashFlow], 
                    num_scenarios_to_show: int = 10,
@@ -196,3 +196,37 @@ def render_cash_flow_analysis(cash_flow_model, economic_scenarios):
         
         output.save()
         st.success("Results downloaded to cash_flow_results.xlsx")
+
+def render_asset_liability_cash_flow_analysis(cash_flow_model, asset_model):
+    st.header("Asset-Liability Cash Flow Analysis")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        bond_alloc = st.slider("Bond Allocation (%)", 0, 100, 55)
+        equity_alloc = 100 - bond_alloc
+        st.metric("Equity Allocation", f"{equity_alloc}%")
+    with col2:
+        strategy = st.selectbox("Reinvestment Strategy", ["Proportional", "Priority Order", "Market Timing"])
+    
+    # Get projections
+    liability_cf = cash_flow_model.get_undiscounted_liability_cf()
+    asset_cf = asset_model.project_asset_cf(bond_alloc/100, equity_alloc/100, strategy)
+    net_cf = asset_cf - liability_cf
+    
+    # Plot with Plotly
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=liability_cf.index, y=liability_cf, name='Liability CF', line=dict(color='red')))
+    fig.add_trace(go.Scatter(x=asset_cf.index, y=asset_cf, name='Asset CF', line=dict(color='blue')))
+    fig.add_trace(go.Scatter(x=net_cf.index, y=net_cf, name='Net CF', line=dict(color='green')))
+    fig.update_layout(title='10-Year Cash Flow Projection', xaxis_title='Year', yaxis_title='Cash Flow ($M)')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Data table
+    if st.checkbox("Show Data Table"):
+        df = pd.DataFrame({'Liability': liability_cf, 'Asset': asset_cf, 'Net': net_cf})
+        st.dataframe(df.style.format("${:.2f}"))
+    
+    # Export
+    if st.button("Export to CSV"):
+        df.to_csv('cash_flow_projections.csv')
+        st.success("Exported to cash_flow_projections.csv")

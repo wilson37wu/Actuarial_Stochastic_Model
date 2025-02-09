@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 from datetime import date
 from src.economic_scenario import EconomicFactors
+from .actuarial_calculations import ActuarialCalculations
 import os
 import datetime
 
@@ -55,11 +56,14 @@ class DynamicCashFlowModel:
         
         for scenario_idx, scenario in enumerate(economic_scenarios):
             # Get mortality rates for each policy based on age
-            mortality_rates = pd.Series(
-                [self.mortality_table.loc[age, 'mortality_rate'] 
-                 for age in policy_data['age']],
-                index=policy_data.index
-            )
+            mortality_rates = [
+                ActuarialCalculations.calculate_mortality_rates(
+                    row['age'], 
+                    row['sex'], 
+                    self.mortality_table
+                )
+                for _, row in policy_data.iterrows()
+            ]
             
             for time_idx, factors in enumerate(scenario):
                 # Calculate benefits
@@ -128,23 +132,29 @@ class DynamicCashFlowModel:
     def _calculate_death_benefits(
         self,
         policy_data: pd.DataFrame,
-        mortality_rates: pd.Series,
+        mortality_rates: List[float],
         time_step: int
     ) -> List[CashFlow]:
         """Calculate death benefits for the current time step."""
         death_benefits = []
         
         # Generate random death probabilities for each policy
-        for policy_id, policy in policy_data.iterrows():
-            base_mortality = mortality_rates[policy_id]
-            death_prob = np.random.uniform(0.001, 0.005) * base_mortality
+        for policy_id, (policy, mortality_rate) in enumerate(zip(policy_data.iterrows(), mortality_rates)):
+            # Assume Uniform Distribution of Deaths (UDD)
+            q_x = mortality_rate  # Annual mortality rate
+            t = 1/12  # Assuming monthly time steps
+            death_prob = 1 - (1 - q_x) ** t  # Convert annual to monthly probability
+            
+            # Apply product-specific factors (example: multiplier for term life)
+            product_factor = policy[1].get('mortality_factor', 1.0)
+            death_prob *= product_factor
             
             if np.random.random() < death_prob:
                 benefit = CashFlow(
-                    policy['face_amount'],
+                    policy[1]['face_amount'],
                     time_step,
                     'death_benefit',
-                    policy_id,
+                    policy[0],
                     0,
                     date.today()
                 )
