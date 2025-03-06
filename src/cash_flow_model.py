@@ -1,40 +1,15 @@
 """
-Dynamic cash flow modeling for assets and liabilities with vectorized operations.
-
-This module provides a comprehensive framework for modeling insurance cash flows using
-vectorized operations for improved performance. It supports:
-
-- Dynamic scenario modeling for both assets and liabilities
-- Vectorized calculations using pandas operations
-- Multiple economic scenarios analysis
-- Risk metric calculations
-- Integration with asset-liability management (ALM)
-
-The main class DynamicCashFlowModel handles all cash flow projections and can be
-used in conjunction with other modules for full ALM analysis.
+Dynamic cash flow modeling for assets and liabilities.
 """
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple, Union
+from typing import List, Dict, Optional, Tuple
 from datetime import date
 from src.economic_scenario import EconomicFactors
-from .actuarial_calculations import ActuarialCalculations
-import os
-import datetime
 
 class CashFlow:
-    """
-    Represents a single cash flow in the model.
-    
-    Attributes:
-        amount (float): The monetary amount of the cash flow
-        time_step (int): The time step at which the cash flow occurs
-        flow_type (str): Type of cash flow (e.g., 'death_benefit', 'surrender_benefit', 'premium')
-        policy_id (int): Identifier for the associated policy
-        scenario_id (int): Identifier for the economic scenario (default: 0)
-        date (date): The date of the cash flow (default: today)
-    """
+    """Represents a single cash flow in the model."""
     def __init__(
             self,
             amount: float,
@@ -52,110 +27,54 @@ class CashFlow:
         self.date = date
 
 class DynamicCashFlowModel:
-    """
-    Models dynamic cash flows for assets and liabilities using vectorized operations.
+    """Models dynamic cash flows for assets and liabilities."""
     
-    This class provides high-performance cash flow modeling capabilities using pandas
-    vectorized operations. It supports:
-    
-    - Multiple economic scenarios
-    - Asset and liability cash flow projections
-    - Risk metric calculations
-    - Integration with investment strategies
-    
-    The model uses vectorized operations for improved performance while maintaining
-    the flexibility to handle complex insurance product features.
-    
-    Args:
-        initial_assets (float): Initial asset value
-        mortality_table (pd.DataFrame): Mortality rates by age, sex, and other factors
-        lapse_rates (Union[Dict[int, float], pd.Series]): Lapse rates by duration
-        expense_factors (Union[Dict[str, float], pd.Series]): Expense factors by type
-        investment_strategy (Dict[str, float]): Asset allocation strategy
-    """
     def __init__(self, 
                  initial_assets: float,
                  mortality_table: pd.DataFrame,
-                 lapse_rates: Union[Dict[int, float], pd.Series],
-                 expense_factors: Union[Dict[str, float], pd.Series],
+                 lapse_rates: Dict[int, float],
+                 expense_factors: Dict[str, float],
                  investment_strategy: Dict[str, float]):
         """Initialize the cash flow model."""
         self.initial_assets = initial_assets
         self.mortality_table = mortality_table
-        self.lapse_rates = pd.Series(lapse_rates) if isinstance(lapse_rates, dict) else lapse_rates
-        self.expense_factors = pd.Series(expense_factors) if isinstance(expense_factors, dict) else expense_factors
+        self.lapse_rates = lapse_rates
+        self.expense_factors = expense_factors
         self.investment_strategy = investment_strategy
         self.cash_flows: List[CashFlow] = []
         
-    def _calculate_mortality_flows(self, policies: pd.DataFrame, valuation_date: date) -> pd.Series:
-        """Vectorized mortality calculation using pandas operations."""
-        # Calculate attained ages
-        attained_ages = (valuation_date - pd.to_datetime(policies['date_of_birth'])).dt.days // 365
-        
-        # Merge with mortality rates
-        merged = policies.merge(
-            self.mortality_table,
-            left_on=['sex', 'smoker_status', attained_ages],
-            right_on=['sex', 'smoker_status', 'age'],
-            how='left'
-        )
-        
-        return merged['face_amount'] * merged['mortality_rate']
-
-    def _calculate_lapse_flows(self, policies: pd.DataFrame, duration: int) -> pd.Series:
-        """Calculate lapse benefits using vectorized operations."""
-        lapse_rate = self.lapse_rates.loc[duration]
-        return policies['account_value'] * 0.9 * lapse_rate  # 90% of account value
-
-    def _calculate_expenses(self, policies: pd.DataFrame, time_step: str) -> pd.Series:
-        """Calculate expenses using vectorized operations."""
-        expense_rate = self.expense_factors[time_step]
-        return policies['premium'] * expense_rate
-
     def project_liability_flows(
         self,
         economic_scenarios: List[List[EconomicFactors]],
         policy_data: pd.DataFrame
     ) -> List[CashFlow]:
-        """Project liability cash flows for all scenarios using vectorized operations."""
+        """Project liability cash flows for all scenarios."""
         liability_flows = []
         
         for scenario_idx, scenario in enumerate(economic_scenarios):
+            # Get mortality rates for each policy based on age
+            mortality_rates = pd.Series(
+                [self.mortality_table.loc[age, 'mortality_rate'] 
+                 for age in policy_data['age']],
+                index=policy_data.index
+            )
+            
             for time_idx, factors in enumerate(scenario):
-                # Calculate benefits using vectorized operations
-                death_flows = self._calculate_mortality_flows(policy_data, factors.date)
-                surrender_flows = self._calculate_lapse_flows(policy_data, time_idx)
-                expense_flows = self._calculate_expenses(policy_data, f"t{time_idx}")
+                # Calculate benefits
+                death_benefits = self._calculate_death_benefits(
+                    policy_data, mortality_rates, time_idx)
+                surrender_benefits = self._calculate_surrender_benefits(
+                    policy_data, time_idx)
                 
-                # Convert to CashFlow objects
-                for policy_id, (death, surrender, expense) in enumerate(
-                    zip(death_flows, surrender_flows, expense_flows)):
-                    
-                    if death > 0:
-                        liability_flows.append(CashFlow(
-                            death, time_idx, 'death_benefit', policy_id,
-                            scenario_idx, factors.date
-                        ))
-                    
-                    if surrender > 0:
-                        liability_flows.append(CashFlow(
-                            surrender, time_idx, 'surrender_benefit', policy_id,
-                            scenario_idx, factors.date
-                        ))
-                    
-                    if expense > 0:
-                        liability_flows.append(CashFlow(
-                            -expense, time_idx, 'expense', policy_id,
-                            scenario_idx, factors.date
-                        ))
-                    
-                    # Add premium inflow
-                    if policy_data.iloc[policy_id]['premium'] > 0:
-                        liability_flows.append(CashFlow(
-                            policy_data.iloc[policy_id]['premium'],
-                            time_idx, 'premium', policy_id,
-                            scenario_idx, factors.date
-                        ))
+                # Project premiums
+                premium_flows = self._calculate_premium_flows(
+                    policy_data, time_idx)
+                
+                # Add flows to results
+                for flow in death_benefits + surrender_benefits + premium_flows:
+                    flow.scenario_id = scenario_idx
+                    flow.date = factors.date
+                    liability_flows.append(flow)
         
         return liability_flows
     
@@ -178,7 +97,7 @@ class DynamicCashFlowModel:
                 fixed_income_return = factors.short_rate + factors.credit_spread
                 equity_return = factors.equity_return
                 
-                # Apply investment strategy using vectorized operations
+                # Apply investment strategy
                 fixed_income_assets = assets * self.investment_strategy.get('fixed_income', 0.7)
                 equity_assets = assets * self.investment_strategy.get('equity', 0.3)
                 
@@ -203,6 +122,82 @@ class DynamicCashFlowModel:
                 assets = assets + fixed_income_income + equity_income + period_liability_flows
                 
         return asset_flows
+    
+    def _calculate_death_benefits(
+        self,
+        policy_data: pd.DataFrame,
+        mortality_rates: pd.Series,
+        time_step: int
+    ) -> List[CashFlow]:
+        """Calculate death benefits for the current time step."""
+        death_benefits = []
+        
+        # Generate random death probabilities for each policy
+        for policy_id, policy in policy_data.iterrows():
+            base_mortality = mortality_rates[policy_id]
+            death_prob = np.random.uniform(0.001, 0.005) * base_mortality
+            
+            if np.random.random() < death_prob:
+                benefit = CashFlow(
+                    policy['face_amount'],
+                    time_step,
+                    'death_benefit',
+                    policy_id,
+                    0,
+                    date.today()
+                )
+                death_benefits.append(benefit)
+        
+        return death_benefits
+    
+    def _calculate_surrender_benefits(
+        self,
+        policy_data: pd.DataFrame,
+        time_step: int
+    ) -> List[CashFlow]:
+        """Calculate surrender benefits for the current time step."""
+        surrender_benefits = []
+        
+        # Get lapse rate for current time step
+        lapse_rate = self.lapse_rates.get(time_step, 0.05)  # Default to 5% if not specified
+        
+        for policy_id, policy in policy_data.iterrows():
+            if np.random.random() < lapse_rate:
+                surrender_value = policy['account_value'] * 0.9  # 90% of account value
+                benefit = CashFlow(
+                    surrender_value,
+                    time_step,
+                    'surrender_benefit',
+                    policy_id,
+                    0,
+                    date.today()
+                )
+                surrender_benefits.append(benefit)
+        
+        return surrender_benefits
+    
+    def _calculate_premium_flows(
+        self,
+        policy_data: pd.DataFrame,
+        time_step: int
+    ) -> List[CashFlow]:
+        """Calculate premium inflows for the current time step."""
+        premium_flows = []
+        
+        for policy_id, policy in policy_data.iterrows():
+            # Assume monthly premium payments
+            if time_step % 12 == 0:  # Premium due at start of each year
+                premium = CashFlow(
+                    policy['premium'],
+                    time_step,
+                    'premium',
+                    policy_id,
+                    0,
+                    date.today()
+                )
+                premium_flows.append(premium)
+        
+        return premium_flows
     
     def calculate_risk_metrics(self,
                              liability_flows: List[CashFlow],
@@ -248,105 +243,3 @@ class DynamicCashFlowModel:
         )
         
         return metrics
-
-    def export_cash_flows(
-        self,
-        output_dir: str,
-        economic_scenarios: List[List[EconomicFactors]],
-        time_step: str = 'monthly'
-    ) -> str:
-        """
-        Export cash flows to Excel with detailed breakdowns.
-        
-        Args:
-            output_dir: Directory to save the Excel file
-            economic_scenarios: List of economic scenarios for discounting
-            time_step: 'monthly' or 'annual'
-            
-        Returns:
-            str: Path to the created Excel file
-        """
-        # Create timestamp for filename
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = os.path.join(output_dir, f"cash_flows_{time_step}_{timestamp}.xlsx")
-        
-        # Convert cash flows to DataFrame
-        df = pd.DataFrame([
-            {
-                'amount': cf.amount,
-                'time_step': cf.time_step,
-                'flow_type': cf.flow_type,
-                'policy_id': cf.policy_id,
-                'scenario_id': cf.scenario_id,
-                'date': cf.date
-            }
-            for cf in self.cash_flows
-        ])
-        
-        # Group cash flows by type
-        flow_types = {
-            'premium': df[df['flow_type'] == 'premium'],
-            'death_benefit': df[df['flow_type'] == 'death_benefit'],
-            'expense': df[df['flow_type'] == 'expense'],
-            'surrender': df[df['flow_type'] == 'surrender'],
-            'guaranteed_benefit': df[df['flow_type'].str.startswith('guaranteed_')],
-            'non_guaranteed_benefit': df[df['flow_type'].str.startswith('non_guaranteed_')]
-        }
-        
-        # Create Excel writer
-        with pd.ExcelWriter(output_path) as writer:
-            # Undiscounted cash flows
-            time_periods = df['time_step'].unique()
-            for flow_name, flow_data in flow_types.items():
-                pivot = pd.pivot_table(
-                    flow_data,
-                    values='amount',
-                    index='scenario_id',
-                    columns='time_step',
-                    aggfunc='sum',
-                    fill_value=0
-                )
-                
-                if time_step == 'annual' and 'monthly' in str(pivot.columns[0]):
-                    # Convert monthly to annual if needed
-                    pivot = pivot.groupby(pivot.columns // 12, axis=1).sum()
-                
-                pivot.to_excel(writer, sheet_name=f'{flow_name}_flows')
-            
-            # Present value calculations using forward rates
-            for scenario_id, scenario in enumerate(economic_scenarios):
-                # Extract rates for the scenario
-                if time_step == 'annual':
-                    rates = np.array([factor.short_rate for factor in scenario[::12]])  # Take every 12th rate
-                else:
-                    rates = np.array([factor.short_rate for factor in scenario])
-                    rates = (1 + rates) ** (1/12) - 1  # Convert to monthly rates
-                
-                # Calculate discount factors
-                discount_factors = np.cumprod(1 / (1 + rates))
-                
-                for flow_name, flow_data in flow_types.items():
-                    # Filter for current scenario
-                    scenario_flows = flow_data[flow_data['scenario_id'] == scenario_id]
-                    
-                    pivot = pd.pivot_table(
-                        scenario_flows,
-                        values='amount',
-                        columns='time_step',
-                        aggfunc='sum',
-                        fill_value=0
-                    )
-                    
-                    if time_step == 'annual' and 'monthly' in str(pivot.columns[0]):
-                        pivot = pivot.groupby(pivot.columns // 12, axis=1).sum()
-                    
-                    # Apply scenario-specific discount factors
-                    pv_flows = pivot * discount_factors[:pivot.shape[1]]
-                    
-                    # Append to existing sheet or create new one
-                    sheet_name = f'{flow_name}_pv_scenario_{scenario_id}'
-                    if len(sheet_name) > 31:  # Excel sheet name length limit
-                        sheet_name = f'{flow_name[:20]}_pv_s{scenario_id}'
-                    pv_flows.to_excel(writer, sheet_name=sheet_name)
-        
-        return output_path

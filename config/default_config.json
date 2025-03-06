@@ -1,0 +1,65 @@
+{
+    "economic": {
+        "interest_rate_mean": 0.03,
+        "interest_rate_vol": 0.02,
+        "equity_return_mean": 0.08,
+        "equity_return_vol": 0.15,
+        "correlation": {
+            "interest_equity": -0.2
+        }
+    },
+    "assets": {
+        "allocation": {
+            "equity": 0.6,
+            "fixed_income": 0.35,
+            "cash": 0.05
+        },
+        "equity": {
+            "market_volatility": 0.15,
+            "dividend_yield": 0.02,
+            "sector_weights": {
+                "Technology": 0.25,
+                "Financial": 0.20,
+                "Healthcare": 0.15,
+                "Consumer": 0.25,
+                "Industrial": 0.15
+            }
+        },
+        "fixed_income": {
+            "duration_target": 7.0,
+            "credit_quality": {
+                "AAA": 0.3,
+                "AA": 0.3,
+                "A": 0.4
+            }
+        }
+    },
+    "liabilities": {
+        "mortality": {
+            "table": "2012IAM",
+            "improvement": 0.01
+        },
+        "lapse": {
+            "base_rate": 0.05,
+            "dynamic_factor": 0.5
+        },
+        "expense": {
+            "acquisition": 100,
+            "maintenance": 50
+        }
+    },
+    "products": {
+        "WL_001": {
+            "type": "whole_life",
+            "premium_type": "level",
+            "payment_period": 20,
+            "face_amount": 100000
+        },
+        "PAR_001": {
+            "type": "participating",
+            "bonus_rate": 0.04,
+            "participation_rate": 0.9,
+            "guarantee": 0.02
+        }
+    }
+}

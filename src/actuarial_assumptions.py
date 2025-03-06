@@ -550,65 +550,24 @@ class MortalityFactors:
         return occupation_factors[occupation_class]
 
 def create_sample_mortality_table(assumptions: ActuarialAssumptions) -> MortalityTable:
-    """Create a sample mortality table with select and ultimate rates."""
-    start_age = 20
-    max_age = 100  # Maximum age in the table
-    
-    # Create ultimate rates using Gompertz-Makeham formula
-    ultimate_rates = {}
-    for age in range(start_age, max_age + 1):
-        A = 0.0001  # Base mortality
-        B = 0.00035  # Initial mortality rate
-        C = 1.098    # Mortality increase rate (9.8% per year)
-        x0 = start_age
-        qx = A + B * (C ** (age - x0))
-        ultimate_rates[age] = min(qx, 1.0)
-    
-    # Create select rates (lower mortality in early durations)
-    select_rates = {}
-    select_period = 5
-    for issue_age in range(start_age, max_age - select_period + 1):
-        for duration in range(select_period):
-            # Select mortality is lower than ultimate, gradually approaching ultimate
-            attained_age = min(issue_age + duration, max_age)
-            ultimate_qx = ultimate_rates[attained_age]
-            select_factor = 0.6 + (0.4 * duration / select_period)  # 60% to 100% of ultimate
-            select_rates[(issue_age, duration)] = ultimate_qx * select_factor
-    
-    # Create mortality improvement assumptions
-    improvement = MortalityImprovement(
-        base_year=2024,
-        annual_improvement={
-            (20, 45): 0.02,   # 2% annual improvement for ages 20-45
-            (46, 65): 0.015,  # 1.5% for ages 46-65
-            (66, 85): 0.01,   # 1% for ages 66-85
-            (86, 100): 0.005  # 0.5% for ages 86+
-        }
-    )
-    
-    return MortalityTable(
-        base_rates=ultimate_rates,
-        assumptions=assumptions
-    )
+    """Create a sample mortality table."""
+    base_rates = {
+        0: 0.001, 30: 0.002, 50: 0.005, 70: 0.01, 90: 0.1
+    }
+    return MortalityTable(base_rates=base_rates, assumptions=assumptions)
 
 def create_sample_lapse_assumption(assumptions: ActuarialAssumptions) -> LapseAssumption:
-    """Create sample lapse assumptions."""
-    return LapseAssumption(
-        base_rates={
-            1: 0.05,  # 5% lapse rate in first year
-            2: 0.04,  # 4% lapse rate in second year
-            3: 0.03,  # 3% lapse rate in third year
-            4: 0.02,  # 2% lapse rate in fourth year
-            5: 0.01,  # 1% lapse rate in fifth year
-        },
-        assumptions=assumptions
-    )
+    """Create a sample lapse assumption."""
+    base_rates = {
+        0: 0.15, 1: 0.12, 2: 0.09, 5: 0.06, 10: 0.03
+    }
+    return LapseAssumption(base_rates=base_rates, assumptions=assumptions)
 
 def create_sample_inflation_assumption(assumptions: ActuarialAssumptions) -> InflationAssumption:
-    """Create sample inflation assumptions."""
+    """Create a sample inflation assumption."""
     return InflationAssumption(
-        base_rate=0.02,  # 2% base inflation
-        wage_inflation=0.03,  # 3% wage inflation
-        medical_inflation=0.04,  # 4% medical inflation
+        base_rate=0.02,
+        wage_inflation=0.03,
+        medical_inflation=0.05,
         assumptions=assumptions
     )

@@ -346,16 +346,6 @@ class ModelGUI:
                     messagebox.showerror("Validation Error", "Asset weights must sum to 1")
                     return False
             
-            # Validate equity allocation
-            if not 0 <= float(self.variables['equity_weight'].get()) <= 1:
-                messagebox.showerror("Validation Error", "Equity allocation must be between 0-100%")
-                return False
-            
-            # Validate volatility
-            if float(self.variables['expected_return'].get()) < 0:
-                messagebox.showerror("Validation Error", "Volatility cannot be negative")
-                return False
-            
             return True
             
         except ValueError as e:

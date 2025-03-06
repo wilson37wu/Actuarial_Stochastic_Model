@@ -15,7 +15,6 @@ from typing import Dict, List, Tuple, Optional
 from src.dashboard_components import styling
 from src.dashboard_components import gcv_analysis
 from src.dashboard_components import dividend_analysis
-from src.dashboard_components import cash_flow_analysis
 from src.dividend_tracker import DividendTracker
 from src.gcv_calculator import GCVCalculator, GradingPattern, GCVParameters
 from src.visualization import ModelVisualizer
@@ -189,7 +188,7 @@ class ModelDashboard:
         page = st.sidebar.selectbox(
             "Choose a section",
             ["GCV Analysis", "Dividend Analysis", "Investment Analysis", 
-             "Liability Analysis", "Portfolio Analysis", "Scenario Analysis", "Cash Flow Analysis"]
+             "Liability Analysis", "Portfolio Analysis", "Scenario Analysis"]
         )
         
         # Display the selected section
@@ -208,12 +207,9 @@ class ModelDashboard:
         elif page == "Portfolio Analysis":
             st.header("Portfolio Analysis")
             self._run_portfolio_analysis()
-        elif page == "Scenario Analysis":
+        else:  # Scenario Analysis
             st.header("Scenario Analysis")
             self._run_scenario_analysis()
-        else:  # Cash Flow Analysis
-            st.header("Cash Flow Analysis")
-            self._run_cash_flow_analysis()
 
     def _run_gcv_analysis(self):
         """Run GCV analysis section."""
@@ -838,12 +834,6 @@ class ModelDashboard:
         ))
         
         st.plotly_chart(fig)
-
-    def _run_cash_flow_analysis(self):
-        """Run cash flow analysis section."""
-        cash_flow_model = self.investment_portfolio.get_cash_flow_model()
-        asset_model = self.investment_portfolio.get_asset_model()
-        render_cash_flow_analysis(cash_flow_model, asset_model)
 
     def _plot_gcv_patterns(self, max_years: int = 30) -> go.Figure:
         """Plot GCV patterns comparison."""
@@ -1474,7 +1464,7 @@ class ModelDashboard:
         page = st.sidebar.selectbox(
             "Choose a section",
             ["GCV Analysis", "Dividend Analysis", "Investment Analysis", 
-             "Liability Analysis", "Portfolio Analysis", "Scenario Analysis", "Cash Flow Analysis"]
+             "Liability Analysis", "Portfolio Analysis", "Scenario Analysis"]
         )
         
         # Display the selected section
@@ -1493,22 +1483,13 @@ class ModelDashboard:
         elif page == "Portfolio Analysis":
             st.header("Portfolio Analysis")
             self._run_portfolio_analysis()
-        elif page == "Scenario Analysis":
+        else:  # Scenario Analysis
             st.header("Scenario Analysis")
             self._run_scenario_analysis()
-        else:  # Cash Flow Analysis
-            st.header("Cash Flow Analysis")
-            self._run_cash_flow_analysis()
 
         # Add export button
         if st.button('Export to Excel'):
             self.export_to_excel()
-
-def main():
-    st.error_container = st.empty()
-
-    def update_error_status(error):
-        st.error_container.error(f"🚨 System Error: {str(error)}")
 
 if __name__ == "__main__":
     st.set_page_config(
@@ -1518,8 +1499,5 @@ if __name__ == "__main__":
         initial_sidebar_state="expanded",
     )
     
-    from dashboard_components.cash_flow_analysis import render_cash_flow_analysis
-    
     dashboard = ModelDashboard()
     dashboard.run_with_export()
-    main()

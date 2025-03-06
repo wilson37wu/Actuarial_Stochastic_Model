@@ -1,189 +1,109 @@
-# Stochastic Actuarial Model for Insurance Contract Liability
+# Actuarial Stochastic Model
 
-## Project Overview
-Implementation of a stochastic model for insurance contract liability evaluation with integrated asset-liability modeling capabilities. The model features advanced economic scenario generation, dynamic cash flow modeling, and comprehensive risk metrics calculation.
+A comprehensive actuarial modeling framework for stochastic analysis of insurance products and portfolios.
 
-## Latest Features (December 2024)
+## Project Structure
 
-### Economic Scenario Generation
-- Hull-White interest rate model for short and long rates
-- Merton jump-diffusion model for equity returns
-- Jarrow-Turnbull model for credit risk
-- Heston stochastic volatility model
-- Correlated inflation scenarios
+```
+actuarial_stochastic_model/
+├── src/                    # Source code
+│   ├── config/            # Configuration management
+│   │   ├── base_config.py # Base configuration class
+│   │   └── model_config.py# Model-specific configuration
+│   ├── models/            # Model implementations
+│   │   ├── assets/       # Asset models (equity, fixed income)
+│   │   ├── liabilities/  # Liability calculations
+│   │   └── products/     # Insurance product models
+│   └── utils/            # Utility functions
+├── data/                  # Data files
+│   ├── scenarios/        # Economic scenarios
+│   └── assumptions/      # Model assumptions
+├── outputs/              # Generated outputs
+│   ├── results/         # Analysis results
+│   └── reports/         # Generated reports
+├── examples/             # Example scripts
+├── tests/               # Test suite
+└── docs/                # Documentation
+```
 
-### Cash Flow Modeling
-- Dynamic policy behavior modeling
-- Mortality and lapse assumptions
-- Premium and benefit calculations
-- Surrender value determination
-- Expense modeling
+## Features
 
-### Risk Metrics
-- Value at Risk (VaR) calculations
-- Conditional Tail Expectation (CTE)
-- NPV distribution analysis
-- Sensitivity testing capabilities
-- Stress scenario analysis
+### Asset Models
+- Public equity with sector analysis
+- Fixed income with duration matching
+- Asset allocation optimization
 
-## Technical Requirements
+### Liability Models
+- Mortality projections
+- Dynamic lapse modeling
+- Expense analysis
 
-### Software Requirements
-- Python 3.9+
-- NumPy for numerical computations
-- Pandas for data manipulation
-- SciPy for statistical functions
-- Streamlit for dashboard interface
-- PyTest for testing
+### Product Models
+- Term life insurance
+- Whole life insurance
+- Participating products
+  - Bonus-based
+  - Cash dividend
 
-### Hardware Requirements
-- Multi-core processor recommended
-- Minimum 16GB RAM
-- SSD storage recommended for large datasets
+### Configuration System
+- Centralized parameter management
+- Validation rules
+- Type checking
+- Easy parameter updates
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/Actuarial_Stochastic_Model.git
-cd Actuarial_Stochastic_Model
+git clone https://github.com/wilson37wu/actuarial_stochastic_model.git
+cd actuarial_stochastic_model
 ```
 
-2. Create and activate a virtual environment:
+2. Create a virtual environment (Python 3.11 recommended):
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install required packages:
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Running the Model
+## Usage
 
-### Dashboard Interface
-Launch the interactive dashboard:
-```bash
-streamlit run src/dashboard/dashboard.py
+1. Configure your model parameters in `config/default_config.json`
+
+2. Run example analysis:
+```python
+from src.models import EquityModel, ParticipatingBonusProduct
+from src.config.model_config import ModelConfig
+
+# Load configuration
+config = ModelConfig("config/default_config.json")
+
+# Create models
+equity_model = EquityModel(config)
+product = ParticipatingBonusProduct(config)
+
+# Run analysis
+results = product.project_cashflows(equity_model)
 ```
-
-### Command Line Interface
-Run scenario analysis from command line:
-```bash
-python run_model.py --scenarios 1000 --years 30
-```
-
-## Model Components
-
-### Economic Scenario Generator (ESG)
-- Interest rate modeling (Hull-White)
-- Equity returns (Merton jump-diffusion)
-- Credit spreads (Jarrow-Turnbull)
-- Inflation scenarios
-- Asset correlations
-
-### Asset-Liability Model
-1. Asset Components:
-   - Fixed income portfolio
-   - Equity investments
-   - Cash and equivalents
-   - Alternative investments
-
-2. Liability Components:
-   - Policy cash flows
-   - Benefit payments
-   - Premium income
-   - Expenses
-   - Surrenders
-
-3. Integration Features:
-   - Dynamic asset allocation
-   - Cash flow matching
-   - Duration management
-   - Rebalancing strategies
-
-### Risk Analytics
-- VaR and CTE calculations
-- Sensitivity analysis
-- Stress testing
-- Key rate durations
-- Portfolio analytics
-
-## Testing Framework
-
-### Unit Tests
-- Scenario generation validation
-- Cash flow calculation testing
-- Risk metric verification
-- Model consistency checks
-
-### Integration Tests
-- End-to-end model validation
-- Scenario consistency
-- Portfolio rebalancing
-- Risk metric aggregation
-
-## Dashboard Features
-
-### Input Parameters
-1. Economic Scenarios:
-   - Interest rate parameters
-   - Equity market settings
-   - Credit spread configurations
-   - Inflation assumptions
-
-2. Policy Parameters:
-   - Mortality assumptions
-   - Lapse rates
-   - Expense factors
-   - Investment strategy
-
-### Visualizations
-1. Scenario Analysis:
-   - Interest rate paths
-   - Equity returns
-   - Credit spread evolution
-   - Inflation trajectories
-
-2. Cash Flow Analysis:
-   - Premium patterns
-   - Benefit payments
-   - Net cash flows
-   - Present value distributions
-
-3. Risk Metrics:
-   - VaR analysis
-   - CTE calculations
-   - Sensitivity measures
-   - Stress test results
 
 ## Documentation
 
-### Model Documentation
-Detailed documentation is available in the `docs` folder:
-- Model methodology
-- Implementation details
-- Validation procedures
-- User guides
+Detailed documentation is available in the `docs/` directory:
+- Model specifications
+- API reference
+- Example workflows
 
-### API Documentation
-API documentation is available for all major components:
-- ESG interfaces
-- Model classes
-- Utility functions
-- Risk calculators
+## Testing
 
-## Contributing
-Contributions are welcome! Please read our contributing guidelines and code of conduct before submitting pull requests.
+Run the test suite:
+```bash
+python -m pytest tests/
+```
 
 ## License
+
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-- Financial modeling community
-- Open-source contributors
-- Academic research partners
-
-## Contact
-For questions and support, please open an issue in the GitHub repository.

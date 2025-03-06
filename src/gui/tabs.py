@@ -109,35 +109,6 @@ class LiabilityTab(ttk.Frame, StyledWidgetMixin):
         )
         ToolTip(mode_combo, "Premium payment frequency")
 
-class AllocationTab(ttk.Frame, StyledWidgetMixin):
-    """Asset allocation strategy configuration"""
-    
-    def __init__(self, parent: ttk.Notebook, variables: Dict[str, Any]):
-        super().__init__(parent)
-        self.variables = variables
-        self.create_allocation_inputs()
-
-    def create_allocation_inputs(self):
-        frame = ttk.LabelFrame(self, text="Strategic Asset Allocation")
-        frame.pack(fill='x', padx=10, pady=5)
-
-        # Strategy selection
-        self.create_styled_label(frame, "Investment Strategy:", 0, 0)
-        self.strategy_combo = self.create_styled_combobox(
-            frame, 
-            self.variables['allocation_strategy'],
-            ['Static', 'Dynamic', 'Liability-Driven'], 
-            0, 1
-        )
-        ToolTip(self.strategy_combo, "Select strategic allocation approach")
-
-        # Target allocation inputs
-        self.create_styled_label(frame, "Bond Allocation (%):", 1, 0)
-        self.bond_entry = self.create_styled_entry(frame, self.variables['bond_allocation'], 1, 1)
-        
-        self.create_styled_label(frame, "Equity Allocation (%):", 2, 0)
-        self.equity_entry = self.create_styled_entry(frame, self.variables['equity_allocation'], 2, 1)
-
 class AssumptionsTab(ttk.Frame, StyledWidgetMixin):
     """Actuarial assumptions tab."""
     
