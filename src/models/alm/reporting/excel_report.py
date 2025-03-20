@@ -15,7 +15,7 @@ def create_excel_report(
     asset_data: pd.DataFrame,
     risk_metrics: pd.DataFrame,
     stress_tests: pd.DataFrame,
-    output_dir: str = "outputs"
+    output_dir: str = "output"
 ) -> str:
     """
     Create a comprehensive Excel report with multiple sheets.
@@ -26,7 +26,7 @@ def create_excel_report(
         asset_data: DataFrame of asset cash flows
         risk_metrics: DataFrame of risk metrics
         stress_tests: DataFrame of stress test results
-        output_dir: Directory for output files
+        output_dir: Directory for output files (default: "output")
         
     Returns:
         str: Path to the generated Excel file

@@ -30,7 +30,7 @@ def create_written_report(
     risk_metrics: Dict[str, List[float]],
     stress_results: Dict[str, float],
     charts_path: str,
-    output_dir: str = "outputs"
+    output_dir: str = "output"
 ) -> None:
     """
     Generate a comprehensive written report in PDF format.
@@ -42,7 +42,7 @@ def create_written_report(
         risk_metrics: Dictionary of risk metrics
         stress_results: Dictionary of stress test results
         charts_path: Path to the dashboard image
-        output_dir: Directory for output files
+        output_dir: Directory for output files (default: "output")
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(output_dir, f"alm_written_report_{timestamp}.pdf")

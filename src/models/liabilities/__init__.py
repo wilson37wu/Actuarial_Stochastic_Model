@@ -1,13 +1,17 @@
-"""Liability models for actuarial stochastic modeling.
-
-This package contains liability models including:
-- Base liability calculations
-- Mortality projections
-- Lapse modeling
+"""
+Liabilities package for actuarial stochastic modeling.
 """
 
 from .liability import LiabilityModel
+from .actuarial_assumptions import (
+    MortalityTable,
+    LapseAssumption,
+    InflationAssumption
+)
 
 __all__ = [
     'LiabilityModel',
+    'MortalityTable',
+    'LapseAssumption',
+    'InflationAssumption'
 ]

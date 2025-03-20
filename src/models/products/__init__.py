@@ -1,19 +1,10 @@
 """
-Insurance product modules.
+Package for insurance product models.
 """
-from .base import BaseInsuranceContract
-from .term import TermInsurance
-from .whole_life import WholeLifeInsurance
-from .participating_cash import ParticipatingWholeLifeCash
-from .participating_bonus import ParticipatingWholeLifeBonus
-from .data_classes import PolicyValues, PolicyLoan
+from .term_insurance import TermInsurance
+from .whole_life_insurance import WholeLifeInsurance
 
 __all__ = [
-    'BaseInsuranceContract',
     'TermInsurance',
-    'WholeLifeInsurance',
-    'ParticipatingWholeLifeCash',
-    'ParticipatingWholeLifeBonus',
-    'PolicyValues',
-    'PolicyLoan'
-] 
+    'WholeLifeInsurance'
+]

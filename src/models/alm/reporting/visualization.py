@@ -79,10 +79,14 @@ def create_risk_metrics_chart(
 
 def create_summary_dashboard(
     figs: List[plt.Figure],
-    output_dir: str = "outputs"
+    output_dir: str = "output"
 ) -> str:
     """
     Create a summary dashboard combining multiple charts.
+    
+    Args:
+        figs: List of figures to combine into a dashboard
+        output_dir: Directory for output files (default: "output")
     
     Returns:
         str: Path to the generated dashboard image

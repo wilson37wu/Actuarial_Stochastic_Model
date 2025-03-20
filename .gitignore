@@ -51,3 +51,6 @@ env/
 
 # Drive upload temporary files
 .tmp.driveupload/
+
+# HKRBC technical specifications
+docs/hkrbc/technical_specs/*.pdf

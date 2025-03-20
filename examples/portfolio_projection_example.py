@@ -10,18 +10,32 @@ from src.fixed_income import Bond, FixedIncomeModel
 from src.asset_model import AssetModel
 
 def create_sample_scenarios(start_date: date, periods: int = 1200) -> pd.DataFrame:
-    """Create sample economic scenarios for testing."""
+    """Create sample economic scenarios for testing.
+    
+    This function generates a DataFrame of simulated monthly economic scenarios containing:
+    - Equity returns: Monthly returns with 8% annual mean return and 20% annual volatility
+    - Risk-free rates: Monthly rates with 3% annual mean and 10% annual volatility
+    
+    The two series have a correlation of 0.3.
+    
+    Args:
+        start_date: The start date for the scenario projections
+        periods: Number of monthly periods to generate (default 1200 = 100 years)
+        
+    Returns:
+        DataFrame with columns 'equity_return' and 'risk_free_rate' indexed by date
+    """
     dates = pd.date_range(start=start_date, periods=periods, freq='M')
     np.random.seed(42)  # For reproducibility
     
     # Generate correlated market returns and risk-free rates
     correlation = 0.3
-    cov_matrix = np.array([[0.04, correlation * 0.04 * 0.01],
-                          [correlation * 0.04 * 0.01, 0.01]])
+    cov_matrix = np.array([[0.04, correlation * 0.04 * 0.01],  # 0.04 = (20% volatility)^2 
+                          [correlation * 0.04 * 0.01, 0.01]])   # 0.01 = (10% volatility)^2
     
     returns = np.random.multivariate_normal(
-        mean=[0.08/12, 0.03/12],  # Monthly mean returns
-        cov=cov_matrix/12,        # Monthly covariance
+        mean=[0.08/12, 0.03/12],  # Monthly mean returns (8% and 3% annual)
+        cov=cov_matrix/12,        # Monthly covariance (divide annual by 12)
         size=periods
     )
     
@@ -31,7 +45,6 @@ def create_sample_scenarios(start_date: date, periods: int = 1200) -> pd.DataFra
     }, index=dates)
     
     return scenarios
-
 def create_sample_portfolio() -> tuple[list[Bond], list[Equity]]:
     """Create a sample mixed portfolio of bonds and equities."""
     today = date.today()

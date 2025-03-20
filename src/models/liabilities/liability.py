@@ -4,6 +4,7 @@ Module for liability modeling and cash flow projections.
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
+import os
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ import pandas as pd
 from .actuarial_assumptions import (
     MortalityTable, LapseAssumption, InflationAssumption
 )
-from .enums import (
+from ...enums import (
     Sex, UnderwritingClass, SmokingStatus, OccupationClass,
     ProductType, DividendOption, InvestmentStrategy, PremiumMode, NonForfeitureOption,
     PremiumStatus
@@ -173,11 +174,95 @@ class LiabilityModel:
         """Add contract to model."""
         self.contracts.append(contract)
     
+    def export_assumptions_to_excel(self, filepath: str, valuation_date: date) -> None:
+        """Export all assumptions used in the model to Excel for audit purposes.
+        
+        Args:
+            filepath: Path to save the Excel file
+            valuation_date: Valuation date for the assumptions
+        """
+        try:
+            with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+                # Export mortality assumptions
+                mortality_df = pd.DataFrame({
+                    'Age': range(0, 121),
+                    'Male_Rate': [self.mortality_table.get_rate(age, Sex.MALE) for age in range(0, 121)],
+                    'Female_Rate': [self.mortality_table.get_rate(age, Sex.FEMALE) for age in range(0, 121)]
+                })
+                mortality_df.to_excel(writer, sheet_name='Mortality_Rates', index=False)
+                
+                # Export lapse assumptions
+                lapse_df = pd.DataFrame({
+                    'Policy_Year': range(1, 31),
+                    'Base_Rate': [self.lapse_assumption.get_rate(year) for year in range(1, 31)],
+                    'Dynamic_Factor': [self.lapse_assumption.get_dynamic_factor(year) for year in range(1, 31)]
+                })
+                lapse_df.to_excel(writer, sheet_name='Lapse_Rates', index=False)
+                
+                # Export inflation assumptions
+                inflation_df = pd.DataFrame({
+                    'Year': pd.date_range(start=valuation_date, periods=30, freq='Y').year,
+                    'Rate': [self.inflation_assumption.get_rate(date) 
+                            for date in pd.date_range(start=valuation_date, periods=30, freq='Y')]
+                })
+                inflation_df.to_excel(writer, sheet_name='Inflation_Rates', index=False)
+                
+                # Export investment returns if available
+                if self.investment_returns:
+                    returns_df = pd.DataFrame({
+                        'Date': sorted(self.investment_returns.keys()),
+                        'Return': [self.investment_returns[date] for date in sorted(self.investment_returns.keys())]
+                    })
+                    returns_df.to_excel(writer, sheet_name='Investment_Returns', index=False)
+                
+                # Export GCV factors if available
+                if self.gcv_calculator.factors:
+                    gcv_data = []
+                    for duration in range(1, 31):
+                        for age in range(20, 86, 5):
+                            gcv_data.append({
+                                'Duration': duration,
+                                'Age': age,
+                                'Factor': self.gcv_calculator.get_factor(duration, age)
+                            })
+                    gcv_df = pd.DataFrame(gcv_data)
+                    gcv_df.to_excel(writer, sheet_name='GCV_Factors', index=False)
+                
+                # Export dividend assumptions
+                dividend_df = pd.DataFrame({
+                    'Parameter': ['Minimum_Dividend_Rate', 'Shareholder_Cost_Rate'],
+                    'Value': [self.dividend_tracker.minimum_dividend_rate,
+                             self.dividend_tracker.shareholder_cost_rate]
+                })
+                dividend_df.to_excel(writer, sheet_name='Dividend_Parameters', index=False)
+                
+        except Exception as e:
+            raise RuntimeError(f"Error exporting assumptions to Excel: {str(e)}")
+
     def project_cashflows(self,
                          valuation_date: date,
                          projection_years: int,
-                         time_step: str = 'M') -> pd.DataFrame:
-        """Project cash flows for all contracts."""
+                         time_step: str = 'M',
+                         export_assumptions: bool = False,
+                         assumptions_file: Optional[str] = None) -> pd.DataFrame:
+        """Project cash flows for all contracts.
+        
+        Args:
+            valuation_date: Starting date for projections
+            projection_years: Number of years to project
+            time_step: Time step for projections ('M' for monthly, 'Y' for yearly)
+            export_assumptions: Whether to export assumptions to Excel
+            assumptions_file: Path to save assumptions Excel file if export_assumptions is True
+        
+        Returns:
+            DataFrame containing projected cash flows
+        """
+        if export_assumptions:
+            if assumptions_file is None:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                assumptions_file = os.path.join(base_dir, 'assumptions_export.xlsx')
+            self.export_assumptions_to_excel(assumptions_file, valuation_date)
+        
         # Generate time points
         if time_step == 'M':
             time_points = pd.date_range(
