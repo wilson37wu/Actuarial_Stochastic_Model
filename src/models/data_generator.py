@@ -8,11 +8,11 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from .enums import (
+from ..enums import (
     Sex, UnderwritingClass, SmokingStatus, OccupationClass,
     ProductType, DividendOption, InvestmentStrategy
 )
-from .models.products import TermInsurance, WholeLifeInsurance
+from .products import TermInsurance, WholeLifeInsurance
 
 class PolicyDataGenerator:
     """Generate sample policy data with realistic distributions."""

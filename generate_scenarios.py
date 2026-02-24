@@ -134,7 +134,7 @@ def generate_and_export_scenarios(num_scenarios=1000, projection_years=30):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except (TypeError, AttributeError):
                         pass
                 adjusted_width = (max_length + 2)
                 worksheet.column_dimensions[column].width = adjusted_width

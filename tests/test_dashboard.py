@@ -23,8 +23,7 @@ Note: Make sure you're in your virtual environment before running tests:
 - Unix/MacOS: source venv/bin/activate
 
 To run the Streamlit app:
-- Run the app: 
-C:\Users\wilso\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\python.exe -m streamlit run src/dashboard/dashboard.py
+- Run the app: python -m streamlit run src/dashboard/dashboard.py
 
 """
 

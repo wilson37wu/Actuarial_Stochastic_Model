@@ -123,7 +123,7 @@ class GCVCalculator:
         try:
             irr = newton(npv, x0=0.05)  # Start with 5% guess
             return max(irr, -1)  # IRR cannot be less than -100%
-        except:
+        except (RuntimeError, ValueError):
             return float('-inf')  # Return -infinity if IRR cannot be found
             
     def _solve_for_target_irr(self, 

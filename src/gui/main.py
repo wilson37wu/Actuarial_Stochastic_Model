@@ -445,7 +445,7 @@ class ModelGUI:
                             try:
                                 if len(str(cell.value)) > max_length:
                                     max_length = len(cell.value)
-                            except:
+                            except (TypeError, AttributeError):
                                 pass
                         adjusted_width = (max_length + 2)
                         worksheet.column_dimensions[column[0].column_letter].width = adjusted_width

@@ -2,8 +2,8 @@
 Module for liability modeling and cash flow projections.
 """
 from dataclasses import dataclass
-from datetime import date, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import date
+from typing import Dict, List, Optional
 import os
 
 import numpy as np
@@ -13,16 +13,13 @@ from .actuarial_assumptions import (
     MortalityTable, LapseAssumption, InflationAssumption
 )
 from ...enums import (
-    Sex, UnderwritingClass, SmokingStatus, OccupationClass,
-    ProductType, DividendOption, InvestmentStrategy, PremiumMode, NonForfeitureOption,
-    PremiumStatus
+    Sex, ProductType, DividendOption, PremiumMode
 )
-from .gcv_calculator import GCVCalculator, GCVFactors
-from .dividend_tracker import DividendTracker
+from ...gcv_calculator import GCVCalculator, GCVFactors
+from ...dividend_tracker import DividendTracker
 from .products import (
-    BaseInsuranceContract, PolicyValues, PolicyLoan
+    BaseInsuranceContract, PolicyValues
 )
-from .products.data_classes import PolicyValues
 
 @dataclass
 class CashFlowProjection:
