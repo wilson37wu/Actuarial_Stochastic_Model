@@ -2,14 +2,13 @@
 Liabilities module for actuarial modeling.
 """
 
-from .mortality import MortalityTable
-from .lapse import LapseAssumption
-from .inflation import InflationAssumption
-from .liability_model import LiabilityModel
+from .actuarial_assumptions import MortalityTable, LapseAssumption, InflationAssumption
+from .liability_model import LiabilityModel, CashFlowProjection
 
 __all__ = [
     'MortalityTable',
     'LapseAssumption',
     'InflationAssumption',
-    'LiabilityModel'
+    'LiabilityModel',
+    'CashFlowProjection',
 ]

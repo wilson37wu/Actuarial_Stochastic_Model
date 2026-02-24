@@ -6,13 +6,13 @@ from typing import List
 
 from .base import BaseInsuranceContract
 from .data_classes import PolicyLoan
-from ..enums import ProductType
+from ...enums import ProductType
 
 @dataclass
 class TermInsurance(BaseInsuranceContract):
     """Term life insurance contract."""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  face_amount: float,
                  term_length: int,
                  **kwargs):
@@ -22,4 +22,4 @@ class TermInsurance(BaseInsuranceContract):
             term_length=term_length,
             **kwargs
         )
-        self.loans: List[PolicyLoan] = []  # Added loans list 
+        self.loans: List[PolicyLoan] = []

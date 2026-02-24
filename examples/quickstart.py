@@ -11,10 +11,10 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from src.config.model_config import ModelConfig
-from src.models.products import TermProduct, WholeLifeProduct
-from src.models.liabilities import LiabilityModel
-from src.utils.enums import (
+from config.model_config import ModelConfig
+from actuarial_stochastic_model.models.products import TermInsurance as TermProduct, WholeLifeInsurance as WholeLifeProduct
+from actuarial_stochastic_model.models.liabilities import LiabilityModel
+from actuarial_stochastic_model.enums import (
     Sex, SmokingStatus, OccupationClass,
     UnderwritingClass, PremiumMode
 )

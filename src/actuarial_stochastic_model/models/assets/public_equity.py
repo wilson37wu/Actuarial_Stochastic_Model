@@ -3,7 +3,7 @@ import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 from datetime import datetime, date
-from ...config.model_config import ModelConfig
+from config.model_config import ModelConfig
 
 @dataclass
 class Equity:

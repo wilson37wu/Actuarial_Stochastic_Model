@@ -34,4 +34,4 @@ class PolicyValues:
     death_benefit: float
     loan_balance: float = 0.0
     reduced_paid_up_value: float = 0.0
-    extended_term_period: int = 0 
+    extended_term_period: int = 0
